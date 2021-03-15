@@ -1,5 +1,17 @@
 import math
 import numpy as np
+
+### This function returns the updated position
+### The input parameters are:
+### the current position x, y
+### the current position vx, dy
+### the elapsed time interval dt
+### newX, newY are the updated position
+def updatePosition(x, y, vx, vy, dt):
+    newX = x + vx * dt
+    newY = y + vy * dt
+    return newX, newY
+
 def kalman2d(n,dt,p_v,q,Z):
     x=0 #Initial position of the robot, in the origin
     y=0
@@ -11,8 +23,7 @@ def kalman2d(n,dt,p_v,q,Z):
 
     for j in range(1,n+1):
         #Prediction step#
-        new_x = x + vx*dt #Prediction of positions x and y
-        new_y = y + vy*dt
+        new_x, new_y = updatePosition(x, y, vx, vy, dt) #Prediction of positions x and y
         new_px = px + (dt**2)*p_v + q #Prediction of the propagated error
         new_py = py + (dt**2)*p_v + q
 
