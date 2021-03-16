@@ -20,7 +20,7 @@ void ConcentricKalman()
 	}
 
 	fstream file; //Initialization of the data
-	file.open("2dKalmanSameError.txt", ios::in);
+	file.open("2dKalmanDataSameError.txt", ios::in);
 	
 	
 	for(int i = 0 ; i < (n/nd) ; i++){ //Loop taking data to vectors, each iteration reconstructs one particle track
@@ -46,7 +46,6 @@ void ConcentricKalman()
 	}
 
 	file.close();
-
 	
 	gStyle->SetOptStat(0); //Don't show histogram statistics box
 	c1->Update();
