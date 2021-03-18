@@ -1,7 +1,8 @@
 void ConcentricKalman()
 {
-	int n = 1000; //Number of positions, 10 for each particle
+	int n = 100; //Number of positions, 10 for each particle
 	int nd = 10; //Number of data points per particle/track to be fitted
+	int fc = 2; //Number of coefficients from the fit to plot a function
 
 	TCanvas *c1 = new TCanvas(); //Canvas initialization
 	c1->Draw();	
@@ -20,7 +21,9 @@ void ConcentricKalman()
 	}
 
 	fstream file; //Initialization of the data
+	fstream coef_file;
 	file.open("2dKalmanDataSameError.txt", ios::in);
+	coef_file.open("coef-fit10.txt", ios::in);
 	
 	
 	for(int i = 0 ; i < (n/nd) ; i++){ //Loop taking data to vectors, each iteration reconstructs one particle track
@@ -28,12 +31,16 @@ void ConcentricKalman()
 		double y[nd];
 		double ex[nd];
 		double ey[nd];
+		double coef[fc]; //Vector with the polynomial coefficients of the fitted track
+
 		for (int  j = 0 ; j < nd ; j++){
 			file >> x[j] >> y[j] >> ex[j] >> ey[j];
-			std::cout << x[j] << "\t" << y[j] << "\t" << "\n";
+			//std::cout << x[j] << "\t" << y[j] << "\t" << "\n";
 		}
 				
 		TGraphErrors *gr = new TGraphErrors(nd,x,y,ex,ey); //Graph initialization to plot the track
+
+		//TGraphErrors *gr = new TGraphErrors("2dKalmanDataSameError.txt","%lg    %lg    %lg    %lg");
 
 		gr->SetMarkerStyle(kFullCircle);
 		gr->SetMarkerSize(.5);
@@ -42,11 +49,21 @@ void ConcentricKalman()
 
 		gr->Draw("P same"); //Drawing points over the circles
 
-		gr->Fit("pol1","+","L same",0,10.5); //Fits our tracks in a line (polynomial of first order). The fit must be set according to the problem being considered
+		TF1 *fa1 = new TF1("fa1","[0]+[1]*x",0,10);
+
+		coef_file >> coef[0] >> coef[1];
+
+		std::cout << coef[1] << "\t" << coef[0] << std::endl;
+
+		fa1->SetParameter(0,coef[1]);
+		fa1->SetParameter(1,coef[0]);
+
+		fa1->Draw("L same");
 	}
 
 	file.close();
-	
+	coef_file.close();
+
 	gStyle->SetOptStat(0); //Don't show histogram statistics box
 	c1->Update();
 }	
