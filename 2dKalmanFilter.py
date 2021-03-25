@@ -16,8 +16,10 @@ def updatePosition(x, y, vx, vy, q, dt):
 def kalman2d(n,dt,p_v,q,Z):
     x=0 #Initial position of the robot, in the origin
     y=0
-    seed_x=Z[0]
-    seed_y=Z[1]
+    realPhi = Z[0]
+    seed_x = Z[1]
+    seed_y = Z[2]
+    print("x: %s y: %s \t" % (seed_x,seed_y))
     initialPhi=np.arctan2(seed_y,seed_x)
     vx=seed_x/math.sqrt(seed_x**2+seed_y**2) #Initial velocities: x being cossine, and y sine
     vy=seed_y/math.sqrt(seed_x**2+seed_y**2)
@@ -36,10 +38,10 @@ def kalman2d(n,dt,p_v,q,Z):
         pred_py = pred_x* np.sqrt(initialVarPhi)
 
         #Measure step#
-        me_x = Z[4*(j-1)]
-        me_y = Z[4*j-3]
-        me_px = Z[4*j-2]
-        me_py = Z[4*j-1]
+        me_x = Z[4*j-3]
+        me_y = Z[4*j-2]
+        me_px = Z[4*j-1]
+        me_py = Z[4*j]
 
         #Update step#
         kgx = pred_px/(pred_px+me_px) #Kalman gain
@@ -65,8 +67,8 @@ def kalman2d(n,dt,p_v,q,Z):
 
     coef_fit = np.polyfit(track_x,track_y,1) #coef_fit is an 1x2 array [c1,c0] where the coefficients are from the polynomial "p(x)=c0*x+c1"
     kalmanPhi = np.arctan(coef_fit[0])
-    f.write("%s\t%s\n" % (coef_fit[0],coef_fit[1]))
-    print("%s\t%s\n" % (coef_fit[0],coef_fit[1]))
+    print("OIA OS ANGULO => MEDIDO: %s\t DI VERDADE: %s \n" % (kalmanPhi,realPhi))
+    f.write("%s\t%s\n" % (realPhi-kalmanPhi,(realPhi-kalmanPhi)/realPhi))
 
     #Uncomment to generate plots in MPL with data and fitting#
     def tfit(t):
@@ -83,20 +85,20 @@ def kalman2d(n,dt,p_v,q,Z):
 
 #Our model will say that the robot moves at speed 1 in the first quadrant of a circle.
 
-data = np.loadtxt("testparticle.txt",dtype=float,delimiter='\t',usecols=range(40)) #Initialization of the data
+data = np.loadtxt("100Particles_errorPhi0p05.txt",dtype=float,delimiter='\t',usecols=range(41)) #Initialization of the data
 
 #Looping Kalman Filter for each particle
-f = open("coef-fit.txt","w+")
-for i in range(0,1):
+f = open("phidiff.txt","w+")
+for i in range(0,100):
     #print("Track %s Phi angle" % (i+1))
-    kalman2d(10,1,0,0,data[:])
+    kalman2d(10,1,0,0,data[i,:])
 
 #Uncomment to generate plots in MPL with data and fitting#
 for i in range(1,11): #Plots circles in MPL
     circle = plt.Circle((0, 0), i*1 , color='r', fill=False)
     plt.gca().add_patch(circle)
 
-plt.xlim([0,10.5]) #Defines axis in MPL
+plt.xlim([-10.5,10.5]) #Defines axis in MPL
 plt.ylim([0,10.5])
 plt.show()
 f.close()
