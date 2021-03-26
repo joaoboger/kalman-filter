@@ -65,8 +65,8 @@ def kalman2d(n,dt,p_v,q,Z):
         #print("Prediction: %s\t%s\t%s\t%s\n" % (pred_x,pred_y,pred_px,pred_py))
         #print("Filtered: %s\t%s\t%s\t%s\n" % (kx,ky,kpx,kpy))
 
-    coef_fit = np.polyfit(track_x,track_y,1) #coef_fit is an 1x2 array [c1,c0] where the coefficients are from the polynomial "p(x)=c0*x+c1"
-    kalmanPhi = np.arctan(coef_fit[0])
+    coef_fit = np.polyfit(track_x,track_y,1) #coef_fit is an 1x2 array [c0,c1] where the coefficients are from the polynomial "p(x)=c0*x+c1"
+    kalmanPhi = np.arctan2(track_y[0],(track_y[0]-coef_fit[1])/coef_fit[0]) #Once we only have the Phi from the fit, and we want only tracks in the first two quadrants for now I take a positive value of Y and discover it's X coordinate in the fit function
     print("OIA OS ANGULO => MEDIDO: %s\t DI VERDADE: %s \n" % (kalmanPhi,realPhi))
     f.write("%s\t%s\n" % (realPhi-kalmanPhi,(realPhi-kalmanPhi)/realPhi))
 
