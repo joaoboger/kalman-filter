@@ -19,7 +19,7 @@ def kalman2d(n,dt,p_v,q,Z):
     realPhi = Z[0]
     seed_x = Z[1]
     seed_y = Z[2]
-    print("x: %s y: %s \t" % (seed_x,seed_y))
+    #print("x: %s y: %s \t" % (seed_x,seed_y))
     initialPhi=np.arctan2(seed_y,seed_x)
     vx=seed_x/math.sqrt(seed_x**2+seed_y**2) #Initial velocities: x being cossine, and y sine
     vy=seed_y/math.sqrt(seed_x**2+seed_y**2)
@@ -67,7 +67,6 @@ def kalman2d(n,dt,p_v,q,Z):
 
     coef_fit = np.polyfit(track_x,track_y,1) #coef_fit is an 1x2 array [c0,c1] where the coefficients are from the polynomial "p(x)=c0*x+c1"
     kalmanPhi = np.arctan2(track_y[0],(track_y[0]-coef_fit[1])/coef_fit[0]) #Once we only have the Phi from the fit, and we want only tracks in the first two quadrants for now I take a positive value of Y and discover it's X coordinate in the fit function
-    print("OIA OS ANGULO => MEDIDO: %s\t DI VERDADE: %s \n" % (kalmanPhi,realPhi))
     f.write("%s\t%s\n" % (realPhi-kalmanPhi,(realPhi-kalmanPhi)/realPhi))
 
     #Uncomment to generate plots in MPL with data and fitting#
@@ -85,11 +84,11 @@ def kalman2d(n,dt,p_v,q,Z):
 
 #Our model will say that the robot moves at speed 1 in the first quadrant of a circle.
 
-data = np.loadtxt("100Particles_errorPhi0p05.txt",dtype=float,delimiter='\t',usecols=range(41)) #Initialization of the data
+data = np.loadtxt("10000Particles_errorPhi0p01.txt",dtype=float,delimiter='\t',usecols=range(41)) #Initialization of the data
 
 #Looping Kalman Filter for each particle
-f = open("phidiff.txt","w+")
-for i in range(0,100):
+f = open("10000phidiffp01.txt","w+")
+for i in range(0,10000):
     #print("Track %s Phi angle" % (i+1))
     kalman2d(10,1,0,0,data[i,:])
 
