@@ -23,11 +23,11 @@ def eomR(vr):
     return newR
 
 def eomPhi(r,vphi):
-    newPhi = vphi/r
+    newPhi = vphi
     return newPhi
 
-def eomVR(vphi):
-    newVR = K*vphi*B
+def eomVR(r,vphi):
+    newVR = K*vphi*B*r
     return newVR
 
 def eomVPhi(r,vr): 
@@ -47,29 +47,31 @@ def updatePosition(r, phi, vr, vphi, dt, j):
 
     radiuserror=0.01
     nosteps=100000
-    dt=dt/10000
+    dt=dt/100
 
-    for k in range(nosteps):
+    print("r:%s\tj-re:%s\n"%(r,j-radiuserror))
+
+    for k in range(0,nosteps):
         if(r<j-radiuserror):
             #print(r,phi,vr,vphi)
             k1 = eomR(vr)
             l1 = eomPhi(r,vphi)
-            m1 = eomVR(vphi)
+            m1 = eomVR(r,vphi)
             n1 = eomVPhi(r,vr)
 
             k2 = eomR(vr+dt*m1/2)
             l2 = eomPhi(r+dt*k1/2,vphi+dt*n1/2)
-            m2 = eomVR(vphi+dt*n1/2)
+            m2 = eomVR(r+dt*k1/2,vphi+dt*n1/2)
             n2 = eomVPhi(r+dt*k1/2,vr+dt*m1/2)
 
             k3 = eomR(vr+dt*m2/2)
             l3 = eomPhi(r+dt*k2/2,vphi+dt*n2/2)
-            m3 = eomVR(vphi+dt*n2/2)
+            m3 = eomVR(r+dt*k2/2,vphi+dt*n2/2)
             n3 = eomVPhi(r+dt*k2/2,vr+dt*m2/2)
 
             k4 = eomR(vr+dt*m3)
             l4 = eomPhi(r+dt*k3,vphi+dt*n3)
-            m4 = eomVR(vphi+dt*n3)
+            m4 = eomVR(r+dt*k3,vphi+dt*n3)
             n4 = eomVPhi(r+dt*k3,vr+dt*m3)
 
             r = r + dt*(k1 + 2*k2 + 2*k3 + k4)/6
@@ -168,8 +170,8 @@ def kalman2d(n,dt,p_v,q,Z):
         initialppy=kpy
         seed_r = np.sqrt(np.power(x,2)+np.power(y,2))
         seed_phi = np.arctan2(y,x)
-        seed_vr = pred_vr
-        seed_vphi = pred_vphi
+        seed_vr = realv
+        seed_vphi = 0
 
         print("Finally Phi: %s"%(seed_phi/np.pi))
 
@@ -206,7 +208,7 @@ f = open(outfname,"w+")
 f2 = open(outfname2,"w+")
 for i in range(0,1):
     #print("Track %s Phi angle" % (i+1))
-    kalman2d(10,1/(10*realv),0,0,data[i,:])
+    kalman2d(1,1/(10*realv),0,0,data[i,:])
 
 #Uncomment to generate plots in MPL with data and fitting#
 for i in range(1,11): #Plots circles in MPL
