@@ -1,6 +1,7 @@
 import math
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.integrate import odeint
 
 q = 1
 m = 0.14 #pions em GeV/c2
@@ -27,12 +28,25 @@ def eomPhi(r,vphi):
     return newPhi
 
 def eomVR(r,vphi):
-    newVR = K*vphi*B*r
+    newVR = (K*B+vphi)*r*vphi
     return newVR
 
-def eomVPhi(r,vr): 
-    newVPhi = -K*vr*B/r
+def eomVPhi(r,vr,vphi): 
+    newVPhi = -(2*vphi+K*B)*vr/r
     return newVPhi
+
+def EofM(icond,t):
+    r=icond[0]
+    phi=icond[1]
+    vr=icond[2]
+    vphi=icond[3]
+
+    newR = vr
+    newPhi = vphi
+    newVR = (K*B+vphi)*r*vphi
+    newVPhi = -(2*vphi+K*B)*vr/r
+
+    return [newR,newPhi,newVR,newVPhi]
 
 
 def updatePosition(r, phi, vr, vphi, dt, j):
@@ -47,7 +61,7 @@ def updatePosition(r, phi, vr, vphi, dt, j):
 
     radiuserror=0.01
     nosteps=100000
-    dt=dt/100
+    dt=dt/1000
 
     print("r:%s\tj-re:%s\n"%(r,j-radiuserror))
 
@@ -57,22 +71,22 @@ def updatePosition(r, phi, vr, vphi, dt, j):
             k1 = eomR(vr)
             l1 = eomPhi(r,vphi)
             m1 = eomVR(r,vphi)
-            n1 = eomVPhi(r,vr)
+            n1 = eomVPhi(r,vr,vphi)
 
             k2 = eomR(vr+dt*m1/2)
             l2 = eomPhi(r+dt*k1/2,vphi+dt*n1/2)
             m2 = eomVR(r+dt*k1/2,vphi+dt*n1/2)
-            n2 = eomVPhi(r+dt*k1/2,vr+dt*m1/2)
+            n2 = eomVPhi(r+dt*k1/2,vr+dt*m1/2,vphi+dt*n1/2)
 
             k3 = eomR(vr+dt*m2/2)
             l3 = eomPhi(r+dt*k2/2,vphi+dt*n2/2)
             m3 = eomVR(r+dt*k2/2,vphi+dt*n2/2)
-            n3 = eomVPhi(r+dt*k2/2,vr+dt*m2/2)
+            n3 = eomVPhi(r+dt*k2/2,vr+dt*m2/2,vphi+dt*n2/2)
 
             k4 = eomR(vr+dt*m3)
             l4 = eomPhi(r+dt*k3,vphi+dt*n3)
             m4 = eomVR(r+dt*k3,vphi+dt*n3)
-            n4 = eomVPhi(r+dt*k3,vr+dt*m3)
+            n4 = eomVPhi(r+dt*k3,vr+dt*m3,vphi+dt*n3)
 
             r = r + dt*(k1 + 2*k2 + 2*k3 + k4)/6
             phi = phi + dt*(l1 + 2*l2 + 2*l3 + l4)/6
@@ -83,6 +97,23 @@ def updatePosition(r, phi, vr, vphi, dt, j):
             break
 
     return r, phi, vr, vphi
+
+def updatePosition2(r, phi, vr, vphi, dt, j): #Calculates the update position with function scipy.integrate.odeint (RK4)
+    t=np.linspace(0,dt/1e2,1000)
+    icond=[r,phi,vr,vphi]
+    x=odeint(EofM,icond,t)
+
+    bestn = -1
+
+    scale=1
+
+    for i in range(0,t.size):
+        if scale*x[i,0]<j-0.01:
+            True
+        else:
+            bestn=i
+
+    return scale*x[i,0],x[i,1],x[i,2],x[i,3]
 
 def kalman2d(n,dt,p_v,q,Z):
     x=0 #Initial position of the particle, in the origin
@@ -125,7 +156,7 @@ def kalman2d(n,dt,p_v,q,Z):
 
         print("entradas rk4: r=%s phi=%s vr=%s vphi=%s"%(seed_r,seed_phi,seed_vr,seed_vphi))
         #Prediction step#
-        pred_r, pred_phi, pred_vr, pred_vphi = updatePosition(seed_r, seed_phi, seed_vr, seed_vphi, dt, j) #Prediction of positions x and y
+        pred_r, pred_phi, pred_vr, pred_vphi = updatePosition2(seed_r, seed_phi, seed_vr, seed_vphi, dt, j) #Prediction of positions x and y
 
         print("RK4: r=%s phi=%s vr=%s vphi=%s" % (pred_r,pred_phi,pred_vr,pred_vphi))
 
@@ -170,10 +201,10 @@ def kalman2d(n,dt,p_v,q,Z):
         initialppy=kpy
         seed_r = np.sqrt(np.power(x,2)+np.power(y,2))
         seed_phi = np.arctan2(y,x)
-        seed_vr = realv
-        seed_vphi = 0
+        seed_vr = pred_vr
+        seed_vphi = pred_vphi
 
-        print("Finally Phi: %s"%(seed_phi/np.pi))
+        #print("Finally Phi: %s"%(seed_phi/np.pi))
 
         #print("Prediction: %s\t%s\t%s\t%s\n" % (pred_x,pred_y,pred_px,pred_py))
         #print("Filtered: %s\t%s\t%s\t%s\n" % (kx,ky,kpx,kpy))
@@ -208,7 +239,7 @@ f = open(outfname,"w+")
 f2 = open(outfname2,"w+")
 for i in range(0,1):
     #print("Track %s Phi angle" % (i+1))
-    kalman2d(1,1/(10*realv),0,0,data[i,:])
+    kalman2d(10,1/(10*realv),0,0,data[i,:])
 
 #Uncomment to generate plots in MPL with data and fitting#
 for i in range(1,11): #Plots circles in MPL
