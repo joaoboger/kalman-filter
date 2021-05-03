@@ -3,39 +3,15 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.integrate import odeint
 
-q = 1
+q=1
 m = 0.14 #pions em GeV/c2
 pT = 0.9 #GeV
 realv = (pT/np.sqrt(np.power(m,2)+np.power(pT,2))) #velocity adimensional
 gamma = 1/np.sqrt(1-np.power(realv,2)) #gamma adimensional
-K = q/(gamma*m) # 1/GeV
+K = (6.072E-3/2)*q/(gamma*m)
 B = 20 #Magnetic field in Tesla
 
-
-### This function returns the updated position
-### The input parameters are:
-### the current position x, y
-### the current velocity vx, vy
-### the elapsed time interval dt
-### newX, newY are the updated position
-
-def eomR(vr):
-    newR = vr
-    return newR
-
-def eomPhi(r,vphi):
-    newPhi = vphi
-    return newPhi
-
-def eomVR(r,vphi):
-    newVR = (K*B+vphi)*r*vphi
-    return newVR
-
-def eomVPhi(r,vr,vphi): 
-    newVPhi = -(2*vphi+K*B)*vr/r
-    return newVPhi
-
-def EofM(icond,t):
+def EofMP(icond,t): 
     r=icond[0]
     phi=icond[1]
     vr=icond[2]
@@ -48,91 +24,56 @@ def EofM(icond,t):
 
     return [newR,newPhi,newVR,newVPhi]
 
+def EofMN(icond,t):
+    r=icond[0]
+    phi=icond[1]
+    vr=icond[2]
+    vphi=icond[3]
 
-def updatePosition(r, phi, vr, vphi, dt, j):
-    #The positions are updated solving the equations of motion of a charged 
-    #particle travelling in a media with a constant magnetic field transverse
-    #to it's velocity. 
+    newR = vr
+    newPhi = vphi
+    newVR = (-K*B+vphi)*r*vphi
+    newVPhi = -(2*vphi-K*B)*vr/r
 
-    #k's are RK4 coefficients of the coordinate r's EDO
-    #l's are RK4 coefficients of the coordinate phi's EDO
-    #m's are RK4 coefficients of the velocity vr's EDO
-    #n's are RK4 coefficients of the velocity vphi's EDO
+    return [newR,newPhi,newVR,newVPhi]
 
-    radiuserror=0.01
-    nosteps=100000
-    dt=dt/1000
+    
+### This function returns the updated position
+### The input parameters are:
+### the current position R, Phi
+### the current velocity V_R, V_Phi
+### the elapsed time interval dt
+### newR, newPhi, newVR, newVPhi are the updated position and velocities
 
-    print("r:%s\tj-re:%s\n"%(r,j-radiuserror))
-
-    for k in range(0,nosteps):
-        if(r<j-radiuserror):
-            #print(r,phi,vr,vphi)
-            k1 = eomR(vr)
-            l1 = eomPhi(r,vphi)
-            m1 = eomVR(r,vphi)
-            n1 = eomVPhi(r,vr,vphi)
-
-            k2 = eomR(vr+dt*m1/2)
-            l2 = eomPhi(r+dt*k1/2,vphi+dt*n1/2)
-            m2 = eomVR(r+dt*k1/2,vphi+dt*n1/2)
-            n2 = eomVPhi(r+dt*k1/2,vr+dt*m1/2,vphi+dt*n1/2)
-
-            k3 = eomR(vr+dt*m2/2)
-            l3 = eomPhi(r+dt*k2/2,vphi+dt*n2/2)
-            m3 = eomVR(r+dt*k2/2,vphi+dt*n2/2)
-            n3 = eomVPhi(r+dt*k2/2,vr+dt*m2/2,vphi+dt*n2/2)
-
-            k4 = eomR(vr+dt*m3)
-            l4 = eomPhi(r+dt*k3,vphi+dt*n3)
-            m4 = eomVR(r+dt*k3,vphi+dt*n3)
-            n4 = eomVPhi(r+dt*k3,vr+dt*m3,vphi+dt*n3)
-
-            r = r + dt*(k1 + 2*k2 + 2*k3 + k4)/6
-            phi = phi + dt*(l1 + 2*l2 + 2*l3 + l4)/6
-            vr = vr + dt*(m1 + 2*m2 + 2*m3 + m4)/6
-            vphi = vphi + dt*(n1 + 2*n2 + 2*n3 + n4)/6
-            
-        else:
-            break
-
-    return r, phi, vr, vphi
-
-def updatePosition2(r, phi, vr, vphi, dt, j): #Calculates the update position with function scipy.integrate.odeint (RK4)
-    t=np.linspace(0,dt/1e2,1000)
-    icond=[r,phi,vr,vphi]
-    x=odeint(EofM,icond,t)
-
+def updatePosition(r, phi, vr, vphi, dt, j, q): #Calculates the update position with function scipy.integrate.odeint (RK4)
+    dt=dt*1.5
+    t=np.linspace(0,dt,10000)
+    if q==1:
+        icond=[r,phi,vr,vphi]
+        x=odeint(EofMP,icond,t)
+    elif q==-1:
+        icond=[r,phi,vr,vphi]
+        x=odeint(EofMN,icond,t)
     bestn = -1
 
-    scale=1
-
     for i in range(0,t.size):
-        if scale*x[i,0]<j-0.01:
+        if x[i,0]<j-0.01:
             True
         else:
             bestn=i
+            break
 
-    return scale*x[i,0],x[i,1],x[i,2],x[i,3]
+    return x[i,0],x[i,1],x[i,2],x[i,3]
 
-def kalman2d(n,dt,p_v,q,Z):
-    x=0 #Initial position of the particle, in the origin
-    y=0
-    realPhi = Z[0]
-    seed_x = Z[1]
-    seed_y = Z[2]
-    #seed_x=1/np.sqrt(2)
-    #seed_y=1/np.sqrt(2)
-    #initialppx = Z[3] # In the beggining we don't have the slightest idea where the particle must be thus 100% error
-    #initialppy = Z[4]
-    initialppx=1/np.sqrt(2)
+def kalman2d(n,dt,p_v,q,Z,Charge):
+    Q=Charge
+
+    realPhi = Z[0] # Angle Phi used to generate tracks
+
+    initialppx=1/np.sqrt(2) #In the first iteration I'm assuming complete ignorance of the track angle
     initialppy=1/np.sqrt(2)
 
-    #vx=seed_x/math.sqrt(seed_x**2+seed_y**2) #Initial velocities: x being cossine, and y sine
-    #vy=seed_y/math.sqrt(seed_x**2+seed_y**2)
-    #vx=1/math.sqrt(2)
-    #vy=1/math.sqrt(2)
-    seed_r = 0.1
+    seed_r = 0.1 #Seed of our first iteration
     seed_phi = 1/np.sqrt(2)
     seed_vr = realv
     seed_vphi = 0
@@ -153,12 +94,8 @@ def kalman2d(n,dt,p_v,q,Z):
     prediction_py = np.array([])
 
     for j in range(1,n+1):
-
-        print("entradas rk4: r=%s phi=%s vr=%s vphi=%s"%(seed_r,seed_phi,seed_vr,seed_vphi))
         #Prediction step#
-        pred_r, pred_phi, pred_vr, pred_vphi = updatePosition2(seed_r, seed_phi, seed_vr, seed_vphi, dt, j) #Prediction of positions x and y
-
-        print("RK4: r=%s phi=%s vr=%s vphi=%s" % (pred_r,pred_phi,pred_vr,pred_vphi))
+        pred_r, pred_phi, pred_vr, pred_vphi = updatePosition(seed_r, seed_phi, seed_vr, seed_vphi, dt, j, Q) #Prediction of positions x and y
 
         pred_x = pred_r*np.cos(pred_phi)
         pred_y = pred_r*np.sin(pred_phi)
@@ -178,8 +115,8 @@ def kalman2d(n,dt,p_v,q,Z):
         ky = pred_y + kgy*(me_y-pred_y)
         kpx = (1-kgx)*pred_px #Kalman uncertainties
         kpy = (1-kgy)*pred_py
-        #print("%s    %s    %s    %s" % (kx,ky,kpx,kpy))
         
+        # Add the values to arrays
         track_x = np.append(track_x,kx)
         track_y = np.append(track_y,ky)
         track_px = np.append(track_px,kpx)
@@ -194,7 +131,8 @@ def kalman2d(n,dt,p_v,q,Z):
         prediction_y = np.append(prediction_y,pred_y)
         prediction_px = np.append(prediction_px,pred_px)
         prediction_py = np.append(prediction_py,pred_py)
-        
+
+        #Update next iteration input values        
         x=kx
         y=ky
         initialppx=kpx
@@ -203,33 +141,13 @@ def kalman2d(n,dt,p_v,q,Z):
         seed_phi = np.arctan2(y,x)
         seed_vr = pred_vr
         seed_vphi = pred_vphi
-
-        #print("Finally Phi: %s"%(seed_phi/np.pi))
-
-        #print("Prediction: %s\t%s\t%s\t%s\n" % (pred_x,pred_y,pred_px,pred_py))
-        #print("Filtered: %s\t%s\t%s\t%s\n" % (kx,ky,kpx,kpy))
-
-    #Uncomment to generate plots in MPL with data and fitting#
-    #def tfit(t):
-    #    return coef_fit[0]*t + coef_fit[1] 
-    #
-    #t1=np.arange(0.0,10.0,0.01)
-    #
-    #plt.plot(t1,tfit(t1),'k', linewidth=0.5)
-    
-    plt.errorbar(track_x,track_y,track_px,track_py,fmt='.',markerfacecolor='blue',markersize=8,label='Kalman Points')  
-
-    plt.errorbar(measurement_x,measurement_y,measurement_px,measurement_py,fmt='.',markerfacecolor='red',markersize=8,label='Measurements')
-
-    plt.errorbar(prediction_x,prediction_y,prediction_px,prediction_py,fmt='.',markerfacecolor='black',markersize=8 ,label='Predictions')
     
     
-    return x,y,kpx,kpy
+    return track_x,track_y,track_px,track_py,measurement_x,measurement_y,measurement_px,measurement_py,prediction_x,prediction_y,prediction_px,prediction_py
 
-#Our model will say that the robot moves at speed 1 in the first quadrant of a circle.
-
+### Initialization of the data
 fname = "10000Particles_Pt0p9_BField20_errorPhi0p01.txt"
-data = np.loadtxt(fname,dtype=float,delimiter='\t',usecols=range(41)) #Initialization of the data
+data = np.loadtxt(fname,dtype=float,delimiter='\t',usecols=range(41)) 
 outfname = "Det2dKalmanData"+fname
 outfname2 = "DetKalmanData"+fname
 
@@ -237,14 +155,28 @@ outfname2 = "DetKalmanData"+fname
 #Looping Kalman Filter for each particle
 f = open(outfname,"w+")
 f2 = open(outfname2,"w+")
-for i in range(0,1):
-    #print("Track %s Phi angle" % (i+1))
-    kalman2d(10,1/(10*realv),0,0,data[i,:])
+for i in range(0,5):
+    #First we calculate the possible trajectories considering the particle both being positive and negative
+    Ptx,Pty,Ptpx,Ptpy,Pmx,Pmy,Pmpx,Pmpy,Ppx,Ppy,Pppx,Pppy = kalman2d(10,1/(realv),0,0,data[i,:],1)
+    diffPM = np.sum(np.square(Pmx-Ppx)+np.square(Pmy-Ppy))
+    Ntx,Nty,Ntpx,Ntpy,Nmx,Nmy,Nmpx,Nmpy,Npx,Npy,Nppx,Nppy = kalman2d(10,1/(realv),0,0,data[i,:],-1)
+    diffNM = np.sum(np.square(Nmx-Npx)+np.square(Nmy-Npy))
 
-#Uncomment to generate plots in MPL with data and fitting#
+    #Then we analyze which one has the least deviation with the measured values and chose this one as our real trajectory
+    if diffNM>diffPM:
+        FinalPredX,FinalPredY,FinalPredPX,FinalPredPY,FinalMeasX,FinalMeasY,FinalMeasPX,FinalMeasPY,FinalTraX,FinalTraY,FinalTraPX,FinalTraPY = Ppx,Ppy,Pppx,Pppy,Pmx,Pmy,Pmpx,Pmpy,Ptx,Pty,Ptpx,Ptpy
+    else:
+        FinalPredX,FinalPredY,FinalPredPX,FinalPredPY,FinalMeasX,FinalMeasY,FinalMeasPX,FinalMeasPY,FinalTraX,FinalTraY,FinalTraPX,FinalPY = Npx,Npy,Nppx,Nppy,Nmx,Nmy,Nmpx,Nmpy,Ntx,Nty,Ntpx,Ntpy
+
+    plt.errorbar(FinalTraX,FinalTraY,FinalTraPX,FinalTraPY,fmt='.',markerfacecolor='blue',markersize=8,label='Kalman Points')  
+    plt.errorbar(FinalMeasX,FinalMeasY,FinalMeasPX,FinalMeasPY,fmt='.',markerfacecolor='red',markersize=8,label='Measurements')
+    plt.errorbar(FinalPredX,FinalPredY,FinalPredPX,FinalPredPY,fmt='.',markerfacecolor='black',markersize=8 ,label='Predictions')   
+
 for i in range(1,11): #Plots circles in MPL
     circle = plt.Circle((0, 0), i*1 , color='r', fill=False)
     plt.gca().add_patch(circle)
+
+plt.gca().set_aspect('equal') # Squared aspect ratio
 
 plt.xlim([-10.5,10.5]) #Defines axis in MPL
 plt.ylim([-10.5,10.5])
