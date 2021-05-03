@@ -7,4 +7,4 @@ It reads line by line the data file using the data as x-coordinate, y-coordinate
 -There are made-up data files in this repo to test plots and new additions to code here named as "XParticles_errorPhiYpZ.txt" where X stands for the number of particles, and the corresponding associated error Y.Z with the data at each point in the Phi coordinate(Polar coordinates) .
 
 # RK-4
--To apply RK-4 on the equations of motion I'm validating my implementation with the function 'odeint' from 'scipy.integrate' library.
+-To apply RK-4 on the equations of motion I'm using the function 'odeint' from 'scipy.integrate' library.
