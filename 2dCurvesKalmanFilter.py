@@ -2,6 +2,7 @@ import math
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.integrate import odeint
+from scipy.optimize import leastsq
 
 q=1
 m = 0.14 #pions em GeV/c2
@@ -64,6 +65,34 @@ def updatePosition(r, phi, vr, vphi, dt, j, q): #Calculates the update position 
             break
 
     return x[i,0],x[i,1],x[i,2],x[i,3]
+
+def circleFit(KTrackX, KTrackY,charge):
+    KTrackR = np.sqrt(np.square(KTrackX)+np.square(KTrackY))
+    KTrackPhi = np.arctan2(KTrackY,KTrackX)
+
+    R = 15 # Circle fit radius
+
+    if charge == 1:
+        fitfunc = lambda p, r: p + np.arccos(r/(2*R))  
+        errfunc = lambda p, r, theta: theta - fitfunc(p, r)
+        init = [np.pi/4]
+        out = leastsq(errfunc,init,args=(KTrackR,KTrackPhi))
+        c = out[0]
+    elif charge == -1:
+        fitfunc = lambda p, r: -p - np.arccos(r/(2*R))  
+        errfunc = lambda p, r, theta: theta - fitfunc(p, r)
+        init = [3*np.pi/4]
+        out = leastsq(errfunc,init,args=(KTrackR,KTrackPhi))
+        c = out[0]
+
+    FitTrackX = KTrackR * np.cos(fitfunc(c[0],KTrackR))
+    FitTrackY = KTrackR * np.sin(fitfunc(c[0],KTrackR))
+
+    plt.plot(FitTrackX,FitTrackY,'--')
+    
+    return 0
+
+
 
 def kalman2d(n,dt,p_v,q,Z,Charge):
     Q=Charge
@@ -155,22 +184,30 @@ outfname2 = "DetKalmanData"+fname
 #Looping Kalman Filter for each particle
 f = open(outfname,"w+")
 f2 = open(outfname2,"w+")
-for i in range(0,5):
+for i in range(0,1):
     #First we calculate the possible trajectories considering the particle both being positive and negative
     Ptx,Pty,Ptpx,Ptpy,Pmx,Pmy,Pmpx,Pmpy,Ppx,Ppy,Pppx,Pppy = kalman2d(10,1/(realv),0,0,data[i,:],1)
     diffPM = np.sum(np.square(Pmx-Ppx)+np.square(Pmy-Ppy))
     Ntx,Nty,Ntpx,Ntpy,Nmx,Nmy,Nmpx,Nmpy,Npx,Npy,Nppx,Nppy = kalman2d(10,1/(realv),0,0,data[i,:],-1)
     diffNM = np.sum(np.square(Nmx-Npx)+np.square(Nmy-Npy))
 
+    charge=0
+
     #Then we analyze which one has the least deviation with the measured values and chose this one as our real trajectory
     if diffNM>diffPM:
         FinalPredX,FinalPredY,FinalPredPX,FinalPredPY,FinalMeasX,FinalMeasY,FinalMeasPX,FinalMeasPY,FinalTraX,FinalTraY,FinalTraPX,FinalTraPY = Ppx,Ppy,Pppx,Pppy,Pmx,Pmy,Pmpx,Pmpy,Ptx,Pty,Ptpx,Ptpy
+        charge = 1
     else:
-        FinalPredX,FinalPredY,FinalPredPX,FinalPredPY,FinalMeasX,FinalMeasY,FinalMeasPX,FinalMeasPY,FinalTraX,FinalTraY,FinalTraPX,FinalPY = Npx,Npy,Nppx,Nppy,Nmx,Nmy,Nmpx,Nmpy,Ntx,Nty,Ntpx,Ntpy
+        FinalPredX,FinalPredY,FinalPredPX,FinalPredPY,FinalMeasX,FinalMeasY,FinalMeasPX,FinalMeasPY,FinalTraX,FinalTraY,FinalTraPX,FinalTraPY = Npx,Npy,Nppx,Nppy,Nmx,Nmy,Nmpx,Nmpy,Ntx,Nty,Ntpx,Ntpy
+        charge = -1
 
-    plt.errorbar(FinalTraX,FinalTraY,FinalTraPX,FinalTraPY,fmt='.',markerfacecolor='blue',markersize=8,label='Kalman Points')  
-    plt.errorbar(FinalMeasX,FinalMeasY,FinalMeasPX,FinalMeasPY,fmt='.',markerfacecolor='red',markersize=8,label='Measurements')
-    plt.errorbar(FinalPredX,FinalPredY,FinalPredPX,FinalPredPY,fmt='.',markerfacecolor='black',markersize=8 ,label='Predictions')   
+    plt.errorbar(FinalTraX,FinalTraY,FinalTraPX,FinalTraPY,fmt='.',markerfacecolor='blue',markersize=8)  
+
+    #plt.errorbar(FinalTraX,FinalTraY,FinalTraPX,FinalTraPY,fmt='.',markerfacecolor='blue',markersize=8,label='Kalman Points')  
+    #plt.errorbar(FinalMeasX,FinalMeasY,FinalMeasPX,FinalMeasPY,fmt='.',markerfacecolor='red',markersize=8,label='Measurements')
+    #plt.errorbar(FinalPredX,FinalPredY,FinalPredPX,FinalPredPY,fmt='.',markerfacecolor='black',markersize=8 ,label='Predictions')   
+
+    circleFit(FinalTraX,FinalTraY,charge)
 
 for i in range(1,11): #Plots circles in MPL
     circle = plt.Circle((0, 0), i*1 , color='r', fill=False)
