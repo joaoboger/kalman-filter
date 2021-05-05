@@ -12,7 +12,7 @@ gamma = 1/np.sqrt(1-np.power(realv,2)) #gamma adimensional
 K = (6.072E-3/2)*q/(gamma*m)
 B = 20 #Magnetic field in Tesla
 
-def EofMP(icond,t): 
+def EofMP(icond,t): # Equations of motion for a positive charge particle
     r=icond[0]
     phi=icond[1]
     vr=icond[2]
@@ -25,7 +25,7 @@ def EofMP(icond,t):
 
     return [newR,newPhi,newVR,newVPhi]
 
-def EofMN(icond,t):
+def EofMN(icond,t): # Equations of motion for a negative charge particle
     r=icond[0]
     phi=icond[1]
     vr=icond[2]
@@ -66,25 +66,27 @@ def updatePosition(r, phi, vr, vphi, dt, j, q): #Calculates the update position 
 
     return x[i,0],x[i,1],x[i,2],x[i,3]
 
-def circleFit(KTrackX, KTrackY,charge):
-    KTrackR = np.sqrt(np.square(KTrackX)+np.square(KTrackY))
+def circleFit(KTrackX, KTrackY,charge): # Fits the trajectory of the particle
+    # The fit is calculated in polar coordinates so we need to convert them
+    KTrackR = np.sqrt(np.square(KTrackX)+np.square(KTrackY)) 
     KTrackPhi = np.arctan2(KTrackY,KTrackX)
 
     R = 15 # Circle fit radius
 
-    if charge == 1:
-        fitfunc = lambda p, r: p + np.arccos(r/(2*R))  
-        errfunc = lambda p, r, theta: theta - fitfunc(p, r)
-        init = [np.pi/4]
-        out = leastsq(errfunc,init,args=(KTrackR,KTrackPhi))
-        c = out[0]
-    elif charge == -1:
+    if charge == 1: # Fit for positive charge particle
+        fitfunc = lambda p, r: p + np.arccos(r/(2*R)) # General equation for a circle in polar coordinates which passes through the origin and make an angle p with the x-axis
+        errfunc = lambda p, r, theta: theta - fitfunc(p, r) # Error function to be minimized
+        init = [np.pi/4] # Initial paremeter of the least squares
+        out = leastsq(errfunc,init,args=(KTrackR,KTrackPhi)) # Least squares through scipy.optimize's function leastsq
+        c = out[0] # Optimized angle p of the circle
+    elif charge == -1: # Fit for negative charge particle
         fitfunc = lambda p, r: -p - np.arccos(r/(2*R))  
         errfunc = lambda p, r, theta: theta - fitfunc(p, r)
         init = [3*np.pi/4]
         out = leastsq(errfunc,init,args=(KTrackR,KTrackPhi))
         c = out[0]
 
+    # Fit points converted back to cartesian coordiates in order to plot them
     FitTrackX = KTrackR * np.cos(fitfunc(c[0],KTrackR))
     FitTrackY = KTrackR * np.sin(fitfunc(c[0],KTrackR))
 
