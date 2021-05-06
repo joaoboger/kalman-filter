@@ -100,7 +100,7 @@ def circleFit(KTrackX, KTrackY,charge): # Fits the trajectory of the particle
 
 
 
-def kalman2d(n,dt,p_v,q,Z,Charge):
+def kalman2d(n,dt,p_v,q,Z,Charge,seed):
     Q=Charge
 
     realPhi = Z[0] # Angle Phi used to generate tracks
@@ -108,10 +108,10 @@ def kalman2d(n,dt,p_v,q,Z,Charge):
     initialppx=1/np.sqrt(2) #In the first iteration I'm assuming complete ignorance of the track angle
     initialppy=1/np.sqrt(2)
 
-    seed_r = 0.1 #Seed of our first iteration
-    seed_phi = 1/np.sqrt(2)
-    seed_vr = realv
-    seed_vphi = 0
+    seed_r = np.sqrt(np.square(seed[0])+np.square(seed[1])) #Seed of our first iteration
+    seed_phi = np.arctan2(seed[1],seed[0])
+    seed_vr = seed[2]
+    seed_vphi = seed[3]
 
     track_x = np.array([]) #Arrays where all positions and errors will be stored to fit the track
     track_y = np.array([])
@@ -137,6 +137,7 @@ def kalman2d(n,dt,p_v,q,Z,Charge):
 
         pred_px = initialppx #Prediction of the propagated error
         pred_py = initialppy
+
         #Measure step#
         me_x = Z[4*j-3]
         me_y = Z[4*j-2]
@@ -180,21 +181,30 @@ def kalman2d(n,dt,p_v,q,Z,Charge):
     
     return track_x,track_y,track_px,track_py,measurement_x,measurement_y,measurement_px,measurement_py,prediction_x,prediction_y,prediction_px,prediction_py
 
-### Initialization of the data
-fname = "10000Particles_Pt0p9_BField20_errorPhi0p01.txt"
-data = np.loadtxt(fname,dtype=float,delimiter='\t',usecols=range(41)) 
-outfname = "Det2dKalmanData"+fname
-outfname2 = "DetKalmanData"+fname
+def dataInit(FileName):### Initialization of the data in which for each detector hit "i" we have 4 columns "x_i","y_i","error-x_i","error-y_i", and the first column gives the initial angle that the particle comes out from the origin
+    fname = FileName
+    data = np.loadtxt(fname,dtype=float,delimiter='\t',usecols=range(41)) 
+    outfname = "Det2dKalmanData"+fname
 
+    return data, outfname
+
+data, outfname = dataInit("10000Particles_Pt0p9_BField20_errorPhi0p01.txt")
 
 #Looping Kalman Filter for each particle
 f = open(outfname,"w+")
-f2 = open(outfname2,"w+")
+
 for i in range(0,5):
+    seed = np.array([]) # Seed to get the initial conditions for our prediction: x-coordinate, y-coordinate, radial velocity, angular velocity
+
+    seed = np.append(seed, data[i,1])
+    seed = np.append(seed, data[i,2])
+    seed = np.append(seed, 1)
+    seed = np.append(seed, 0)
+
     #First we calculate the possible trajectories considering the particle both being positive and negative
-    Ptx,Pty,Ptpx,Ptpy,Pmx,Pmy,Pmpx,Pmpy,Ppx,Ppy,Pppx,Pppy = kalman2d(10,1/(realv),0,0,data[i,:],1)
+    Ptx,Pty,Ptpx,Ptpy,Pmx,Pmy,Pmpx,Pmpy,Ppx,Ppy,Pppx,Pppy = kalman2d(10,1/(realv),0,0,data[i,:],1,seed)
     diffPM = np.sum(np.square(Pmx-Ppx)+np.square(Pmy-Ppy))
-    Ntx,Nty,Ntpx,Ntpy,Nmx,Nmy,Nmpx,Nmpy,Npx,Npy,Nppx,Nppy = kalman2d(10,1/(realv),0,0,data[i,:],-1)
+    Ntx,Nty,Ntpx,Ntpy,Nmx,Nmy,Nmpx,Nmpy,Npx,Npy,Nppx,Nppy = kalman2d(10,1/(realv),0,0,data[i,:],-1,seed)
     diffNM = np.sum(np.square(Nmx-Npx)+np.square(Nmy-Npy))
 
     charge=0
@@ -226,4 +236,3 @@ plt.ylim([-10.5,10.5])
 plt.legend()
 plt.show()
 f.close()
-f2.close()
