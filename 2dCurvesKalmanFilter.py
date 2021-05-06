@@ -70,27 +70,31 @@ def circleFit(KTrackX, KTrackY,charge): # Fits the trajectory of the particle
     # The fit is calculated in polar coordinates so we need to convert them
     KTrackR = np.sqrt(np.square(KTrackX)+np.square(KTrackY)) 
     KTrackPhi = np.arctan2(KTrackY,KTrackX)
+    
+    s = np.abs(-(KTrackY[-1]/KTrackX[-1])*KTrackX[4]+KTrackY[4])/np.sqrt(1+np.square(KTrackY[-1]/KTrackX[-1])) # saggita
+    L = 5 # Half of the distance from te origin until the last hit
 
-    R = 15 # Circle fit radius
+    Rinit = np.square(L)/(2*s)
+    print("Initial R = %s" % Rinit)
 
     if charge == 1: # Fit for positive charge particle
-        fitfunc = lambda p, r: p + np.arccos(r/(2*R)) # General equation for a circle in polar coordinates which passes through the origin and make an angle p with the x-axis
+        fitfunc = lambda p, r: p[0] + np.arccos(r/(2*p[1])) # General equation for a circle in polar coordinates which passes through the origin and make an angle p with the x-axis
         errfunc = lambda p, r, theta: theta - fitfunc(p, r) # Error function to be minimized
-        init = [np.pi/4] # Initial paremeter of the least squares
+        init = [np.pi/4, Rinit] # Initial paremeter of the least squares
         out = leastsq(errfunc,init,args=(KTrackR,KTrackPhi)) # Least squares through scipy.optimize's function leastsq
         c = out[0] # Optimized angle p of the circle
     elif charge == -1: # Fit for negative charge particle
-        fitfunc = lambda p, r: -p - np.arccos(r/(2*R))  
+        fitfunc = lambda p, r: -p[0] - np.arccos(r/(2*p[1]))  
         errfunc = lambda p, r, theta: theta - fitfunc(p, r)
-        init = [3*np.pi/4]
+        init = [3*np.pi/4, Rinit]
         out = leastsq(errfunc,init,args=(KTrackR,KTrackPhi))
         c = out[0]
 
     # Fit points converted back to cartesian coordiates in order to plot them
-    FitTrackX = KTrackR * np.cos(fitfunc(c[0],KTrackR))
-    FitTrackY = KTrackR * np.sin(fitfunc(c[0],KTrackR))
+    FitTrackX = KTrackR * np.cos(fitfunc(c,KTrackR))
+    FitTrackY = KTrackR * np.sin(fitfunc(c,KTrackR))
 
-    plt.plot(FitTrackX,FitTrackY,'--')
+    plt.plot(FitTrackX,FitTrackY,'--', label = r'$R_{found} = $ %s' % (c[1]))
     
     return 0
 
@@ -186,7 +190,7 @@ outfname2 = "DetKalmanData"+fname
 #Looping Kalman Filter for each particle
 f = open(outfname,"w+")
 f2 = open(outfname2,"w+")
-for i in range(0,1):
+for i in range(0,5):
     #First we calculate the possible trajectories considering the particle both being positive and negative
     Ptx,Pty,Ptpx,Ptpy,Pmx,Pmy,Pmpx,Pmpy,Ppx,Ppy,Pppx,Pppy = kalman2d(10,1/(realv),0,0,data[i,:],1)
     diffPM = np.sum(np.square(Pmx-Ppx)+np.square(Pmy-Ppy))
