@@ -75,12 +75,11 @@ def circleFit(KTrackX, KTrackY,charge): # Fits the trajectory of the particle
     L = 5 # Half of the distance from te origin until the last hit
 
     Rinit = np.square(L)/(2*s)
-    print("Initial R = %s" % Rinit)
 
     if charge == 1: # Fit for positive charge particle
         fitfunc = lambda p, r: p[0] + np.arccos(r/(2*p[1])) # General equation for a circle in polar coordinates which passes through the origin and make an angle p with the x-axis
         errfunc = lambda p, r, theta: theta - fitfunc(p, r) # Error function to be minimized
-        init = [np.pi/4, Rinit] # Initial paremeter of the least squares
+        init = [-np.pi/4, Rinit] # Initial paremeter of the least squares
         out = leastsq(errfunc,init,args=(KTrackR,KTrackPhi)) # Least squares through scipy.optimize's function leastsq
         c = out[0] # Optimized angle p of the circle
     elif charge == -1: # Fit for negative charge particle
@@ -94,7 +93,9 @@ def circleFit(KTrackX, KTrackY,charge): # Fits the trajectory of the particle
     FitTrackX = KTrackR * np.cos(fitfunc(c,KTrackR))
     FitTrackY = KTrackR * np.sin(fitfunc(c,KTrackR))
 
-    plt.plot(FitTrackX,FitTrackY,'--', label = r'$R_{found} = $ %s' % (c[1]))
+    plt.plot(FitTrackX,FitTrackY,'--', label = r'$R_{found} = $ %.5s' % (c[1]))
+
+    f.write("%s\n"%(c[1]))
     
     return 0
 
@@ -184,7 +185,7 @@ def kalman2d(n,dt,p_v,q,Z,Charge,seed):
 def dataInit(FileName):### Initialization of the data in which for each detector hit "i" we have 4 columns "x_i","y_i","error-x_i","error-y_i", and the first column gives the initial angle that the particle comes out from the origin
     fname = FileName
     data = np.loadtxt(fname,dtype=float,delimiter='\t',usecols=range(41)) 
-    outfname = "Det2dKalmanData"+fname
+    outfname = "CurvesRfoundData"+fname
 
     return data, outfname
 
@@ -193,7 +194,7 @@ data, outfname = dataInit("10000Particles_Pt0p9_BField20_errorPhi0p01.txt")
 #Looping Kalman Filter for each particle
 f = open(outfname,"w+")
 
-for i in range(0,5):
+for i in range(0,10000):
     seed = np.array([]) # Seed to get the initial conditions for our prediction: x-coordinate, y-coordinate, radial velocity, angular velocity
 
     seed = np.append(seed, data[i,1])
@@ -230,9 +231,10 @@ for i in range(1,11): #Plots circles in MPL
     plt.gca().add_patch(circle)
 
 plt.gca().set_aspect('equal') # Squared aspect ratio
+plt.title(r"$p_T=0.9$GeV, $m_{\pi}=0.14$GeV/c$^2$, $B=20$T",size=15)
 
 plt.xlim([-10.5,10.5]) #Defines axis in MPL
-plt.ylim([-10.5,10.5])
+plt.ylim([-2.5,10.5])
 plt.legend()
 plt.show()
 f.close()
