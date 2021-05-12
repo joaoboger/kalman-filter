@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 
 data = np.loadtxt("10000phidiffp01.txt",dtype=float,delimiter='\t',usecols=range(2)) #Loading file with two columns of data
 
-fig,axs = plt.subplots(1,2) #Configuring side by side plots
+fig = plt.figure(1) #Configuring side by side plots
 
 hrange = 0.02 #Range of plot
 bins = np.linspace(-hrange,hrange,100) #Number of bins and interval where it's defined
