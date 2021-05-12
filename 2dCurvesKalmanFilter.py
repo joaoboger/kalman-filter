@@ -1,8 +1,10 @@
+import os
 import math
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.integrate import odeint
 from scipy.optimize import leastsq
+
 
 q=1
 m = 0.14 #pions em GeV/c2
@@ -66,7 +68,7 @@ def updatePosition(r, phi, vr, vphi, dt, j, q): #Calculates the update position 
 
     return x[i,0],x[i,1],x[i,2],x[i,3]
 
-def circleFit(KTrackX, KTrackY,charge): # Fits the trajectory of the particle
+def circleFit(KTrackX, KTrackY,charge,plot,writetofile): # Fits the trajectory of the particle
     # The fit is calculated in polar coordinates so we need to convert them
     KTrackR = np.sqrt(np.square(KTrackX)+np.square(KTrackY)) 
     KTrackPhi = np.arctan2(KTrackY,KTrackX)
@@ -93,9 +95,11 @@ def circleFit(KTrackX, KTrackY,charge): # Fits the trajectory of the particle
     FitTrackX = KTrackR * np.cos(fitfunc(c,KTrackR))
     FitTrackY = KTrackR * np.sin(fitfunc(c,KTrackR))
 
-    plt.plot(FitTrackX,FitTrackY,'--', label = r'$R_{found} = $ %.5s' % (c[1]))
+    if plot == True: 
+        plt.plot(FitTrackX,FitTrackY,'--', label = r'$R_{found} = $ %.5s' % (c[1]))
 
-    f.write("%s\n"%(c[1]))
+    if writetofile == True:
+        f.write("%s\n"%(c[1]))
     
     return 0
 
@@ -182,59 +186,66 @@ def kalman2d(n,dt,p_v,q,Z,Charge,seed):
     
     return track_x,track_y,track_px,track_py,measurement_x,measurement_y,measurement_px,measurement_py,prediction_x,prediction_y,prediction_px,prediction_py
 
-def dataInit(FileName):### Initialization of the data in which for each detector hit "i" we have 4 columns "x_i","y_i","error-x_i","error-y_i", and the first column gives the initial angle that the particle comes out from the origin
-    fname = FileName
-    data = np.loadtxt(fname,dtype=float,delimiter='\t',usecols=range(41)) 
-    outfname = "CurvesRfoundData"+fname
+def dataInit(file):### Initialization of the data in which for each detector hit "i" we have 4 columns "x_i","y_i","error-x_i","error-y_i", and the first column gives the initial angle that the particle comes out from the origin
+    fname = file.name
+    data = np.loadtxt(file.path,dtype=float,delimiter='\t',usecols=range(41)) 
+    outfname = "MeasCurvesRfoundData"+fname
 
     return data, outfname
 
-data, outfname = dataInit("10000Particles_Pt0p9_BField20_errorPhi0p01.txt")
+dirloc = r"/home/jboger/2021.1/kalman-filter/data"
 
-#Looping Kalman Filter for each particle
-f = open(outfname,"w+")
+for file in os.scandir(dirloc):
+    data, outfname = dataInit(file)
 
-for i in range(0,10000):
-    seed = np.array([]) # Seed to get the initial conditions for our prediction: x-coordinate, y-coordinate, radial velocity, angular velocity
+    outfolder = r"/home/jboger/2021.1/kalman-filter/out"
+    completeOutput = os.path.join(outfolder,outfname)
 
-    seed = np.append(seed, data[i,1])
-    seed = np.append(seed, data[i,2])
-    seed = np.append(seed, 1)
-    seed = np.append(seed, 0)
+    f = open(completeOutput,"w+")
+    #Looping Kalman Filter for each particle
+    #### Loop over tracks
+    for i in range(0,10000):
 
-    #First we calculate the possible trajectories considering the particle both being positive and negative
-    Ptx,Pty,Ptpx,Ptpy,Pmx,Pmy,Pmpx,Pmpy,Ppx,Ppy,Pppx,Pppy = kalman2d(10,1/(realv),0,0,data[i,:],1,seed)
-    diffPM = np.sum(np.square(Pmx-Ppx)+np.square(Pmy-Ppy))
-    Ntx,Nty,Ntpx,Ntpy,Nmx,Nmy,Nmpx,Nmpy,Npx,Npy,Nppx,Nppy = kalman2d(10,1/(realv),0,0,data[i,:],-1,seed)
-    diffNM = np.sum(np.square(Nmx-Npx)+np.square(Nmy-Npy))
+        seed = np.array([]) # Seed to get the initial conditions for our prediction: x-coordinate, y-coordinate, radial velocity, angular velocity
+        seed = np.append(seed, data[i,1])
+        seed = np.append(seed, data[i,2])
 
-    charge=0
+        seed = np.append(seed, 1)
+        seed = np.append(seed, 0)
+        #First we calculate the possible trajectories considering the particle both being positive and negative
+        Ptx,Pty,Ptpx,Ptpy,Pmx,Pmy,Pmpx,Pmpy,Ppx,Ppy,Pppx,Pppy = kalman2d(10,1/(realv),0,0,data[i,:],1,seed)
 
-    #Then we analyze which one has the least deviation with the measured values and chose this one as our real trajectory
-    if diffNM>diffPM:
-        FinalPredX,FinalPredY,FinalPredPX,FinalPredPY,FinalMeasX,FinalMeasY,FinalMeasPX,FinalMeasPY,FinalTraX,FinalTraY,FinalTraPX,FinalTraPY = Ppx,Ppy,Pppx,Pppy,Pmx,Pmy,Pmpx,Pmpy,Ptx,Pty,Ptpx,Ptpy
-        charge = 1
-    else:
-        FinalPredX,FinalPredY,FinalPredPX,FinalPredPY,FinalMeasX,FinalMeasY,FinalMeasPX,FinalMeasPY,FinalTraX,FinalTraY,FinalTraPX,FinalTraPY = Npx,Npy,Nppx,Nppy,Nmx,Nmy,Nmpx,Nmpy,Ntx,Nty,Ntpx,Ntpy
-        charge = -1
+        diffPM = np.sum(np.square(Pmx-Ppx)+np.square(Pmy-Ppy))
+        Ntx,Nty,Ntpx,Ntpy,Nmx,Nmy,Nmpx,Nmpy,Npx,Npy,Nppx,Nppy = kalman2d(10,1/(realv),0,0,data[i,:],-1,seed)
+        diffNM = np.sum(np.square(Nmx-Npx)+np.square(Nmy-Npy))
+        charge=0
 
-    plt.errorbar(FinalTraX,FinalTraY,FinalTraPX,FinalTraPY,fmt='.',markerfacecolor='blue',markersize=8)  
+        #Then we analyze which one has the least deviation with the measured values and chose this one as our real trajectory
+        if diffNM>diffPM:
 
-    #plt.errorbar(FinalTraX,FinalTraY,FinalTraPX,FinalTraPY,fmt='.',markerfacecolor='blue',markersize=8,label='Kalman Points')  
-    #plt.errorbar(FinalMeasX,FinalMeasY,FinalMeasPX,FinalMeasPY,fmt='.',markerfacecolor='red',markersize=8,label='Measurements')
-    #plt.errorbar(FinalPredX,FinalPredY,FinalPredPX,FinalPredPY,fmt='.',markerfacecolor='black',markersize=8 ,label='Predictions')   
+            FinalPredX,FinalPredY,FinalPredPX,FinalPredPY,FinalMeasX,FinalMeasY,FinalMeasPX,FinalMeasPY,FinalTraX,FinalTraY,FinalTraPX,FinalTraPY = Ppx,Ppy,Pppx,Pppy,Pmx,Pmy,Pmpx,Pmpy,Ptx,Pty,Ptpx,Ptpy
+            charge = 1
+        else:
+            FinalPredX,FinalPredY,FinalPredPX,FinalPredPY,FinalMeasX,FinalMeasY,FinalMeasPX,FinalMeasPY,FinalTraX,FinalTraY,FinalTraPX,FinalTraPY = Npx,Npy,Nppx,Nppy,Nmx,Nmy,Nmpx,Nmpy,Ntx,Nty,Ntpx,Ntpy
+            charge = -1
+        #plt.errorbar(FinalTraX,FinalTraY,FinalTraPX,FinalTraPY,fmt='.',markerfacecolor='blue',markersize=8)  
 
-    circleFit(FinalTraX,FinalTraY,charge)
+        #plt.errorbar(FinalTraX,FinalTraY,FinalTraPX,FinalTraPY,fmt='.',markerfacecolor='blue',markersize=8,label='Kalman Points')  
+        #plt.errorbar(FinalMeasX,FinalMeasY,FinalMeasPX,FinalMeasPY,fmt='.',markerfacecolor='red',markersize=8,label='Measurements')
 
-for i in range(1,11): #Plots circles in MPL
-    circle = plt.Circle((0, 0), i*1 , color='r', fill=False)
-    plt.gca().add_patch(circle)
+        #plt.errorbar(FinalPredX,FinalPredY,FinalPredPX,FinalPredPY,fmt='.',markerfacecolor='black',markersize=8 ,label='Predictions')   
+        circleFit(FinalMeasX,FinalMeasY,charge,0,1)
 
-plt.gca().set_aspect('equal') # Squared aspect ratio
-plt.title(r"$p_T=0.9$GeV, $m_{\pi}=0.14$GeV/c$^2$, $B=20$T",size=15)
 
-plt.xlim([-10.5,10.5]) #Defines axis in MPL
-plt.ylim([-2.5,10.5])
-plt.legend()
-plt.show()
-f.close()
+    for i in range(1,11): #Plots circles in MPL
+        circle = plt.Circle((0, 0), i*1 , color='r', fill=False)
+        plt.gca().add_patch(circle)
+
+    plt.gca().set_aspect('equal') # Squared aspect ratio
+    plt.title(r"$p_T=0.9$GeV, $m_{\pi}=0.14$GeV/c$^2$, $B=20$T",size=15)
+
+    plt.xlim([-10.5,10.5]) #Defines axis in MPL
+    plt.ylim([-2.5,10.5])
+    plt.legend()
+    #plt.show()
+    f.close()
