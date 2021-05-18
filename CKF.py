@@ -153,7 +153,13 @@ def findNearest2LayerHits(l2projhit,arrayLayerHits,tolerance):
     
     return selectedHits
 
-
+def simpleHistogram(data,nbins):
+    data.sort()
+    hEnd = data[-1]
+    bins = np.linspace(0,round(hEnd),nbins)
+    plt.figure(2)
+    plt.hist(data,bins,density=True,color='#5e090d')
+    plt.show()
 
 def kalman2d(n,dt,p_v,q,Z,Charge,seed):
     Q=Charge
@@ -305,6 +311,8 @@ def dataInit(file):### Initialization of the data in which for each detector hit
 
 dirloc = r"/home/jboger/2021.1/kalman-filter/CKFdata"
 
+NumbNear=[]
+
 for file in os.scandir(dirloc):
     print(file.name.split)
     if file.name == 'out':
@@ -320,7 +328,7 @@ for file in os.scandir(dirloc):
     #Looping Kalman Filter for each particle
     #### Loop over tracks
     fig,axs = plt.subplots()
-    for i in range(0,20):
+    for i in range(0,100):
 
         l1hit = np.array([]) # Seed to get the initial conditions for our prediction: x-coordinate, y-coordinate, radial velocity, angular velocity
         l1hit = np.append(l1hit, arrayLayerHits[0,4*i])
@@ -333,6 +341,8 @@ for file in os.scandir(dirloc):
 
         ### Find nearest hits of second layer
         selHits = findNearest2LayerHits(l2projhit,arrayLayerHits,0.05)
+
+        NumbNear.append(len(selHits))
         
         mks=7
         pointsLayer=[[l1hit[0],l2projhit[0]],[l1hit[1],l2projhit[1]]]
@@ -354,4 +364,6 @@ plt.xlim([0,2.5]) #Defines axis in MPL
 plt.ylim([0,2.5])
 plt.legend()
 plt.show()
+print(NumbNear)
+simpleHistogram(NumbNear,10)
 f.close()
