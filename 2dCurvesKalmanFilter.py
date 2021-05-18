@@ -103,6 +103,32 @@ def circleFit(KTrackX, KTrackY,charge,plot,writetofile): # Fits the trajectory o
     
     return 0
 
+def conformalMapping(TrackX,TrackY):
+    PolarPhi = np.array([])
+    PhiV = np.array([])
+    TrackU = np.array([])
+    TrackV = np.array([])
+    for i in range(len(TrackX)):
+        x = TrackX[i]
+        y = TrackY[i]
+        u = TrackX[i]/(np.square(TrackX[i]) + np.square(TrackY[i]))
+        v = TrackY[i]/(np.square(TrackX[i]) + np.square(TrackY[i]))
+        TrackU = np.append(TrackU, u)
+        TrackV = np.append(TrackV,v)
+        PolarPhi = np.append(PolarPhi, np.arctan2(y,x))
+
+        lfitfunc = lambda p,x: p[0]+p[1]*x
+        lerrfunc = lambda p,x,y: y-fitfunc(p,x)
+        init=[0,np.pi/4]
+        out = leastsq(errfunc,init,args=(TrackU,TrackV))
+        c=out[0]
+        PhiV = np.append(PhiV, c[1])
+        print("CM: %f\t%f\n"%(PhiV[i],PolarPhi[i]))
+    
+    axs.plot(TrackU,TrackV,'bo')
+    axs.plot(TrackX,TrackY,'ro')
+    return PolarPhi, PhiV
+
 
 
 def kalman2d(n,dt,p_v,q,Z,Charge,seed):
@@ -189,22 +215,30 @@ def kalman2d(n,dt,p_v,q,Z,Charge,seed):
 def dataInit(file):### Initialization of the data in which for each detector hit "i" we have 4 columns "x_i","y_i","error-x_i","error-y_i", and the first column gives the initial angle that the particle comes out from the origin
     fname = file.name
     data = np.loadtxt(file.path,dtype=float,delimiter='\t',usecols=range(41)) 
-    outfname = "MeasCurvesRfoundData"+fname
+    outfname = "2dHistPhi"+fname
 
     return data, outfname
 
-dirloc = r"/home/jboger/2021.1/kalman-filter/data"
+dirloc = r"/home/jboger/2021.1/kalman-filter/tgt"
+
+HistPhiV = np.array([])
+HistPhiPolar = np.array([])
 
 for file in os.scandir(dirloc):
+    print(file.name.split)
+    if file.name == 'out':
+        break
+    
     data, outfname = dataInit(file)
 
-    outfolder = r"/home/jboger/2021.1/kalman-filter/out"
+    outfolder = r"/home/jboger/2021.1/kalman-filter/tgt/out"
     completeOutput = os.path.join(outfolder,outfname)
 
     f = open(completeOutput,"w+")
     #Looping Kalman Filter for each particle
     #### Loop over tracks
-    for i in range(0,10000):
+    fig,axs = plt.subplots()
+    for i in range(0,1):
 
         seed = np.array([]) # Seed to get the initial conditions for our prediction: x-coordinate, y-coordinate, radial velocity, angular velocity
         seed = np.append(seed, data[i,1])
@@ -232,20 +266,27 @@ for file in os.scandir(dirloc):
 
         #plt.errorbar(FinalTraX,FinalTraY,FinalTraPX,FinalTraPY,fmt='.',markerfacecolor='blue',markersize=8,label='Kalman Points')  
         #plt.errorbar(FinalMeasX,FinalMeasY,FinalMeasPX,FinalMeasPY,fmt='.',markerfacecolor='red',markersize=8,label='Measurements')
+        #plt.errorbar(FinalPredX,FinalPredY,FinalPredPX,FinalPredPY,fmt='.',markerfacecolor='black',markersize=8 ,label='Predictions')  
 
-        #plt.errorbar(FinalPredX,FinalPredY,FinalPredPX,FinalPredPY,fmt='.',markerfacecolor='black',markersize=8 ,label='Predictions')   
-        circleFit(FinalMeasX,FinalMeasY,charge,0,1)
+        #circleFit(FinalMeasX,FinalMeasY,charge,1,0)
 
+        tmpPolarPhi,tmpPhiV = conformalMapping(FinalTraX,FinalTraY)
+        HistPhiPolar = np.append(HistPhiPolar,tmpPolarPhi)
+        HistPhiV = np.append(HistPhiV,tmpPhiV)
 
-    for i in range(1,11): #Plots circles in MPL
-        circle = plt.Circle((0, 0), i*1 , color='r', fill=False)
-        plt.gca().add_patch(circle)
+for k in range(len(HistPhiPolar)):
+    print(HistPhiV[k],HistPhiPolar[k])
+    #f.write("%f\t%f\n"%(HistPhiV[k],HistPhiPolar[k]))
 
-    plt.gca().set_aspect('equal') # Squared aspect ratio
-    plt.title(r"$p_T=0.9$GeV, $m_{\pi}=0.14$GeV/c$^2$, $B=20$T",size=15)
+for i in range(1,11): #Plots circles in MPL
+    circle = plt.Circle((0, 0), i*1 , color='r', fill=False)
+    #plt.gca().add_patch(circle)
 
-    plt.xlim([-10.5,10.5]) #Defines axis in MPL
-    plt.ylim([-2.5,10.5])
-    plt.legend()
-    #plt.show()
-    f.close()
+plt.gca().set_aspect('equal') # Squared aspect ratio
+plt.title(r"$p_T=0.9$GeV, $m_{\pi}=0.14$GeV/c$^2$, $B=20$T",size=15)
+
+plt.xlim([-10.5,10.5]) #Defines axis in MPL
+plt.ylim([-2.5,10.5])
+plt.legend()
+plt.show()
+f.close()
