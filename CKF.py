@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.integrate import odeint
 from scipy.optimize import leastsq
+from numpy.linalg import norm
 
 
 q=1
@@ -129,6 +130,29 @@ def conformalMapping(TrackX,TrackY):
     axs.plot(TrackX,TrackY,'ro')
     return PolarPhi, PhiV
 
+def lineTo2Layer(FirstLayerHit):
+    lineTheta = np.arctan2(FirstLayerHit[1],FirstLayerHit[0])
+
+    # So we want our hit (R=2,Theta=lineTheta)
+    l2hit = np.array([])
+    l2hit = np.append(l2hit, (2)*np.cos(lineTheta))
+    l2hit = np.append(l2hit, (2)*np.sin(lineTheta))
+
+    return l2hit
+
+def findNearest2LayerHits(l2projhit,arrayLayerHits,tolerance):
+    tol = tolerance
+
+    selectedHits = [] # List with the index of selected hits in arrayLayerHits[1,:]
+
+    for i in range(int(arrayLayerHits.shape[1]/4)):
+        testingHit = np.array([arrayLayerHits[1,i*4],arrayLayerHits[1,i*4+1]])
+        distance = norm(l2projhit-testingHit)
+        if distance <= tolerance:
+            selectedHits.append(i)
+    
+    return selectedHits
+
 
 
 def kalman2d(n,dt,p_v,q,Z,Charge,seed):
@@ -170,10 +194,10 @@ def kalman2d(n,dt,p_v,q,Z,Charge,seed):
         pred_py = initialppy
 
         #Measure step#
-        me_x = Z[4*j-3]
-        me_y = Z[4*j-2]
-        me_px = Z[4*j-1]
-        me_py = Z[4*j]
+        me_x = Z[4*j-4]
+        me_y = Z[4*j-3]
+        me_px = Z[4*j-2]
+        me_py = Z[4*j-1]
 
         #Update step#
         kgx = pred_px/(pred_px+me_px) #Kalman gain
@@ -212,6 +236,39 @@ def kalman2d(n,dt,p_v,q,Z,Charge,seed):
     
     return track_x,track_y,track_px,track_py,measurement_x,measurement_y,measurement_px,measurement_py,prediction_x,prediction_y,prediction_px,prediction_py
 
+### Function which reconstructs trajectories of charged
+### particles under a transverse magnetic field (B) to 
+### it's, velocity travelling through 10 detectors.
+### INPUTS: Particle velocity, array  of measurements,  
+### seed of the first hit.
+### OUTPUT: No output, it'll plot the reconstruction.
+
+def kalmanFullReconstruction(realv,data,l1hit):
+    #First we calculate the possible trajectories considering the particle both being positive and negative
+    Ptx,Pty,Ptpx,Ptpy,Pmx,Pmy,Pmpx,Pmpy,Ppx,Ppy,Pppx,Pppy = kalman2d(10,1/(realv),0,0,data[i,:],1,l1hit)
+
+    diffPM = np.sum(np.square(Pmx-Ppx)+np.square(Pmy-Ppy))
+    Ntx,Nty,Ntpx,Ntpy,Nmx,Nmy,Nmpx,Nmpy,Npx,Npy,Nppx,Nppy = kalman2d(10,1/(realv),0,0,data[i,:],-1,l1hit)
+    diffNM = np.sum(np.square(Nmx-Npx)+np.square(Nmy-Npy))
+    charge=0
+
+    #Then we analyze which one has the least deviation with the measured values and chose this one as our real trajectory
+    if diffNM>diffPM:
+
+        FinalPredX,FinalPredY,FinalPredPX,FinalPredPY,FinalMeasX,FinalMeasY,FinalMeasPX,FinalMeasPY,FinalTraX,FinalTraY,FinalTraPX,FinalTraPY = Ppx,Ppy,Pppx,Pppy,Pmx,Pmy,Pmpx,Pmpy,Ptx,Pty,Ptpx,Ptpy
+        charge = 1
+    else:
+        FinalPredX,FinalPredY,FinalPredPX,FinalPredPY,FinalMeasX,FinalMeasY,FinalMeasPX,FinalMeasPY,FinalTraX,FinalTraY,FinalTraPX,FinalTraPY = Npx,Npy,Nppx,Nppy,Nmx,Nmy,Nmpx,Nmpy,Ntx,Nty,Ntpx,Ntpy
+        charge = -1
+    #plt.errorbar(FinalTraX,FinalTraY,FinalTraPX,FinalTraPY,fmt='.',markerfacecolor='blue',markersize=8)  
+
+    #plt.errorbar(FinalTraX,FinalTraY,FinalTraPX,FinalTraPY,fmt='.',markerfacecolor='blue',markersize=8,label='Kalman Points')  
+    #plt.errorbar(FinalMeasX,FinalMeasY,FinalMeasPX,FinalMeasPY,fmt='.',markerfacecolor='red',markersize=8,label='Measurements')
+    #plt.errorbar(FinalPredX,FinalPredY,FinalPredPX,FinalPredPY,fmt='.',markerfacecolor='black',markersize=8 ,label='Predictions')  
+        
+    #circleFit(FinalMeasX,FinalMeasY,charge,1,0)
+
+
 def dataInit(file):### Initialization of the data in which for each detector hit "i" we have 4 columns "x_i","y_i","error-x_i","error-y_i", and the first column gives the initial angle that the particle comes out from the origin
     fname = file.name
     data = np.loadtxt(file.path,dtype=float,delimiter=' ',usecols=range(4)) 
@@ -244,8 +301,6 @@ def dataInit(file):### Initialization of the data in which for each detector hit
 
     arrayLayerHits = np.array(LayerHits) # Array of arrays composed of each layer's hits
 
-    print(arrayLayerHits[0,:])
-
     return data, outfname, arrayLayerHits
 
 dirloc = r"/home/jboger/2021.1/kalman-filter/CKFdata"
@@ -255,7 +310,7 @@ for file in os.scandir(dirloc):
     if file.name == 'out':
         break
     
-    data, outfname, FirstLayerHits = dataInit(file)
+    data, outfname, arrayLayerHits = dataInit(file)
 
     outfolder = r"/home/jboger/2021.1/kalman-filter/CKFdata/out"
     completeOutput = os.path.join(outfolder,outfname)
@@ -265,48 +320,38 @@ for file in os.scandir(dirloc):
     #Looping Kalman Filter for each particle
     #### Loop over tracks
     fig,axs = plt.subplots()
-    for i in range(0,1):
+    for i in range(0,20):
 
-        seed = np.array([]) # Seed to get the initial conditions for our prediction: x-coordinate, y-coordinate, radial velocity, angular velocity
-        seed = np.append(seed, data[4*i])
-        seed = np.append(seed, data[4*i+1])
-        seed = np.append(seed, data[4*i+2])
-        seed = np.append(seed, data[4*i+3])
+        l1hit = np.array([]) # Seed to get the initial conditions for our prediction: x-coordinate, y-coordinate, radial velocity, angular velocity
+        l1hit = np.append(l1hit, arrayLayerHits[0,4*i])
+        l1hit = np.append(l1hit, arrayLayerHits[0,4*i+1])
+        l1hit = np.append(l1hit, arrayLayerHits[0,4*i+2])
+        l1hit = np.append(l1hit, arrayLayerHits[0,4*i+3])
 
-        #First we calculate the possible trajectories considering the particle both being positive and negative
-        Ptx,Pty,Ptpx,Ptpy,Pmx,Pmy,Pmpx,Pmpy,Ppx,Ppy,Pppx,Pppy = kalman2d(10,1/(realv),0,0,data[i,:],1,seed)
+        ### Projection a line through origin and L1Hit to the second layer (R=2)
+        l2projhit = lineTo2Layer(l1hit) 
 
-        diffPM = np.sum(np.square(Pmx-Ppx)+np.square(Pmy-Ppy))
-        Ntx,Nty,Ntpx,Ntpy,Nmx,Nmy,Nmpx,Nmpy,Npx,Npy,Nppx,Nppy = kalman2d(10,1/(realv),0,0,data[i,:],-1,seed)
-        diffNM = np.sum(np.square(Nmx-Npx)+np.square(Nmy-Npy))
-        charge=0
+        ### Find nearest hits of second layer
+        selHits = findNearest2LayerHits(l2projhit,arrayLayerHits,0.05)
+        
+        mks=7
+        pointsLayer=[[l1hit[0],l2projhit[0]],[l1hit[1],l2projhit[1]]]
+        plt.plot(pointsLayer[0],pointsLayer[1],'--',marker='^', color='green',ms=mks)
 
-        #Then we analyze which one has the least deviation with the measured values and chose this one as our real trajectory
-        if diffNM>diffPM:
+        for i in range(len(selHits)):
+            plt.plot(arrayLayerHits[1,selHits[i]*4],arrayLayerHits[1,selHits[i]*4+1], marker = 'x', color='blue', ms=mks)
 
-            FinalPredX,FinalPredY,FinalPredPX,FinalPredPY,FinalMeasX,FinalMeasY,FinalMeasPX,FinalMeasPY,FinalTraX,FinalTraY,FinalTraPX,FinalTraPY = Ppx,Ppy,Pppx,Pppy,Pmx,Pmy,Pmpx,Pmpy,Ptx,Pty,Ptpx,Ptpy
-            charge = 1
-        else:
-            FinalPredX,FinalPredY,FinalPredPX,FinalPredPY,FinalMeasX,FinalMeasY,FinalMeasPX,FinalMeasPY,FinalTraX,FinalTraY,FinalTraPX,FinalTraPY = Npx,Npy,Nppx,Nppy,Nmx,Nmy,Nmpx,Nmpy,Ntx,Nty,Ntpx,Ntpy
-            charge = -1
-        #plt.errorbar(FinalTraX,FinalTraY,FinalTraPX,FinalTraPY,fmt='.',markerfacecolor='blue',markersize=8)  
-
-        #plt.errorbar(FinalTraX,FinalTraY,FinalTraPX,FinalTraPY,fmt='.',markerfacecolor='blue',markersize=8,label='Kalman Points')  
-        #plt.errorbar(FinalMeasX,FinalMeasY,FinalMeasPX,FinalMeasPY,fmt='.',markerfacecolor='red',markersize=8,label='Measurements')
-        #plt.errorbar(FinalPredX,FinalPredY,FinalPredPX,FinalPredPY,fmt='.',markerfacecolor='black',markersize=8 ,label='Predictions')  
-
-        #circleFit(FinalMeasX,FinalMeasY,charge,1,0)
 
 
 for i in range(1,11): #Plots circles in MPL
     circle = plt.Circle((0, 0), i*1 , color='r', fill=False)
-    #plt.gca().add_patch(circle)
+    plt.gca().add_patch(circle)
 
 plt.gca().set_aspect('equal') # Squared aspect ratio
 plt.title(r"$p_T=0.9$GeV, $m_{\pi}=0.14$GeV/c$^2$, $B=20$T",size=15)
 
-plt.xlim([-10.5,10.5]) #Defines axis in MPL
-plt.ylim([-2.5,10.5])
+plt.xlim([0,2.5]) #Defines axis in MPL
+plt.ylim([0,2.5])
 plt.legend()
 plt.show()
 f.close()
