@@ -156,9 +156,11 @@ def findNearest2LayerHits(l2projhit,arrayLayerHits,tolerance):
 def simpleHistogram(data,nbins):
     data.sort()
     hEnd = data[-1]
-    bins = np.linspace(0,round(hEnd),nbins)
-    plt.figure(2)
-    plt.hist(data,bins,density=True,color='#5e090d')
+    bins = np.linspace(0,16,nbins)
+    fig,axs = plt.subplots()
+    axs.hist(data,bins,density=True,color='#5e090d')
+    axs.set_xlabel(r"Near hits")
+    axs.set_ylabel("Distributiuon of tracks")
     plt.show()
 
 def kalman2d(n,dt,p_v,q,Z,Charge,seed):
@@ -292,8 +294,7 @@ def dataInit(file):### Initialization of the data in which for each detector hit
     tmp8 = []
     tmp9 = []
     tmp10 = []
-
-    for i in range(len(data[:,0])):
+    for i in range(len(data[:,0])):            
         SqrRad = np.square(data[i,0])+np.square(data[i,1])
         Rad = int(np.round(np.sqrt(SqrRad)))
 
@@ -311,14 +312,15 @@ def dataInit(file):### Initialization of the data in which for each detector hit
 
 dirloc = r"/home/jboger/2021.1/kalman-filter/CKFdata"
 
-NumbNear=[]
+NumbNear = [] # Stores the number of selected hits from Layer 2
+Diff2Real = []
 
 for file in os.scandir(dirloc):
-    print(file.name.split)
     if file.name == 'out':
         break
     
     data, outfname, arrayLayerHits = dataInit(file)
+    print(len(arrayLayerHits[:,0]))
 
     outfolder = r"/home/jboger/2021.1/kalman-filter/CKFdata/out"
     completeOutput = os.path.join(outfolder,outfname)
@@ -329,27 +331,26 @@ for file in os.scandir(dirloc):
     #### Loop over tracks
     fig,axs = plt.subplots()
     for i in range(0,100):
-
-        l1hit = np.array([]) # Seed to get the initial conditions for our prediction: x-coordinate, y-coordinate, radial velocity, angular velocity
-        l1hit = np.append(l1hit, arrayLayerHits[0,4*i])
-        l1hit = np.append(l1hit, arrayLayerHits[0,4*i+1])
-        l1hit = np.append(l1hit, arrayLayerHits[0,4*i+2])
-        l1hit = np.append(l1hit, arrayLayerHits[0,4*i+3])
+        # Seed to get the initial conditions for our prediction: x-coordinate, y-coordinate, radial velocity, angular velocity
+        l1hit = np.array([arrayLayerHits[0,4*i], arrayLayerHits[0,4*i+1], arrayLayerHits[0,4*i+2], arrayLayerHits[0,4*i+3]]) 
 
         ### Projection a line through origin and L1Hit to the second layer (R=2)
         l2projhit = lineTo2Layer(l1hit) 
 
         ### Find nearest hits of second layer
-        selHits = findNearest2LayerHits(l2projhit,arrayLayerHits,0.05)
+        selHits = findNearest2LayerHits(l2projhit,arrayLayerHits,0.13)
+        print(selHits)
 
         NumbNear.append(len(selHits))
         
         mks=7
         pointsLayer=[[l1hit[0],l2projhit[0]],[l1hit[1],l2projhit[1]]]
-        plt.plot(pointsLayer[0],pointsLayer[1],'--',marker='^', color='green',ms=mks)
+        plt.plot(pointsLayer[0],pointsLayer[1],'--',marker='^', color='green',ms=0)
+        plt.plot(l2projhit[0],l2projhit[1],marker='^', color='green', ms=mks)
 
         for i in range(len(selHits)):
             plt.plot(arrayLayerHits[1,selHits[i]*4],arrayLayerHits[1,selHits[i]*4+1], marker = 'x', color='blue', ms=mks)
+            #plt.plot(arrayLayerHits[selHits[i],0],arrayLayerHits[selHits[i],1],'bo', ms=(mks-1))
 
 
 
@@ -364,6 +365,5 @@ plt.xlim([0,2.5]) #Defines axis in MPL
 plt.ylim([0,2.5])
 plt.legend()
 plt.show()
-print(NumbNear)
 simpleHistogram(NumbNear,10)
 f.close()
