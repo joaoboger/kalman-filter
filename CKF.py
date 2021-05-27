@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from scipy.integrate import odeint
 from scipy.optimize import leastsq
 from numpy.linalg import norm
+from trackerHit import TrackerHit # Class called as TrackerHit(hitId=0, x=0, y=0, z=0, used=False)
 
 
 q=1
@@ -282,6 +283,8 @@ def dataInit(file):### Initialization of the data in which for each detector hit
     data = np.loadtxt(file.path,dtype=float,delimiter=' ',usecols=range(4)) 
     outfname = "tmp"+fname
 
+    theHits = {} # Dictionary storing 
+
     LayerHits = []
 
     tmp1 = []
@@ -294,7 +297,10 @@ def dataInit(file):### Initialization of the data in which for each detector hit
     tmp8 = []
     tmp9 = []
     tmp10 = []
-    for i in range(len(data[:,0])):            
+    for i in range(len(data[:,0])):
+        hit = TrackerHit(x=data[i,0], y=data[i,1]) # Default values of hitId = z = 0 and used = False
+        theHits[hit.hitId] = hit.position()
+
         SqrRad = np.square(data[i,0])+np.square(data[i,1])
         Rad = int(np.round(np.sqrt(SqrRad)))
 
@@ -302,6 +308,8 @@ def dataInit(file):### Initialization of the data in which for each detector hit
         eval('tmp'+str(Rad)+'.append(data[i,1])')
         eval('tmp'+str(Rad)+'.append(data[i,2])')
         eval('tmp'+str(Rad)+'.append(data[i,3])')
+    
+    print(len(theHits))
     
     for i in range(1,11):
         eval('LayerHits.append(tmp'+str(i)+')')
@@ -320,7 +328,6 @@ for file in os.scandir(dirloc):
         break
     
     data, outfname, arrayLayerHits = dataInit(file)
-    print(len(arrayLayerHits[:,0]))
 
     outfolder = r"/home/jboger/2021.1/kalman-filter/CKFdata/out"
     completeOutput = os.path.join(outfolder,outfname)
@@ -330,7 +337,7 @@ for file in os.scandir(dirloc):
     #Looping Kalman Filter for each particle
     #### Loop over tracks
     fig,axs = plt.subplots()
-    for i in range(0,100):
+    for i in range(5,10):
         # Seed to get the initial conditions for our prediction: x-coordinate, y-coordinate, radial velocity, angular velocity
         l1hit = np.array([arrayLayerHits[0,4*i], arrayLayerHits[0,4*i+1], arrayLayerHits[0,4*i+2], arrayLayerHits[0,4*i+3]]) 
 
@@ -349,7 +356,7 @@ for file in os.scandir(dirloc):
         plt.plot(l2projhit[0],l2projhit[1],marker='^', color='green', ms=mks)
 
         for i in range(len(selHits)):
-            plt.plot(arrayLayerHits[1,selHits[i]*4],arrayLayerHits[1,selHits[i]*4+1], marker = 'x', color='blue', ms=mks)
+            plt.plot(arrayLayerHits[1,selHits[i]*4],arrayLayerHits[1,selHits[i]*4+1], marker = '*', color='blue', ms=mks)
             #plt.plot(arrayLayerHits[selHits[i],0],arrayLayerHits[selHits[i],1],'bo', ms=(mks-1))
 
 
