@@ -309,7 +309,7 @@ def dataInit(file):### Initialization of the data in which for each detector hit
         eval('tmp'+str(Rad)+'.append(data[i,2])')
         eval('tmp'+str(Rad)+'.append(data[i,3])')
     
-    print(len(theHits))
+    print(len(theHits) )
     
     for i in range(1,11):
         eval('LayerHits.append(tmp'+str(i)+')')
@@ -320,8 +320,9 @@ def dataInit(file):### Initialization of the data in which for each detector hit
 
 dirloc = r"/home/jboger/2021.1/kalman-filter/CKFdata"
 
-NumbNear = [] # Stores the number of selected hits from Layer 2
 Diff2Real = []
+
+seeds = []
 
 for file in os.scandir(dirloc):
     if file.name == 'out':
@@ -337,7 +338,7 @@ for file in os.scandir(dirloc):
     #Looping Kalman Filter for each particle
     #### Loop over tracks
     fig,axs = plt.subplots()
-    for i in range(5,10):
+    for i in range(4,5):
         # Seed to get the initial conditions for our prediction: x-coordinate, y-coordinate, radial velocity, angular velocity
         l1hit = np.array([arrayLayerHits[0,4*i], arrayLayerHits[0,4*i+1], arrayLayerHits[0,4*i+2], arrayLayerHits[0,4*i+3]]) 
 
@@ -345,19 +346,68 @@ for file in os.scandir(dirloc):
         l2projhit = lineTo2Layer(l1hit) 
 
         ### Find nearest hits of second layer
-        selHits = findNearest2LayerHits(l2projhit,arrayLayerHits,0.13)
-        print(selHits)
+        selHitsL2 = findNearest2LayerHits(l2projhit,arrayLayerHits,0.13)
+        recTracks = []
 
-        NumbNear.append(len(selHits))
-        
-        mks=7
-        pointsLayer=[[l1hit[0],l2projhit[0]],[l1hit[1],l2projhit[1]]]
-        plt.plot(pointsLayer[0],pointsLayer[1],'--',marker='^', color='green',ms=0)
-        plt.plot(l2projhit[0],l2projhit[1],marker='^', color='green', ms=mks)
+        for j in range(len(selHitsL2)):
+            ### Load seed
+            l2hit = [arrayLayerHits[1,selHitsL2[j]*4],arrayLayerHits[1,selHitsL2[j]*4+1],arrayLayerHits[1,selHitsL2[j]*4+2],arrayLayerHits[1,selHitsL2[j]*4+3]]
+            tmpPlusTrack = [[l1hit[0],l1hit[1]],[l2hit[0],l2hit[1]]]
+            tmpMinusTrack = [[l1hit[0],l1hit[1]],[l2hit[0],l2hit[1]]]
 
-        for i in range(len(selHits)):
-            plt.plot(arrayLayerHits[1,selHits[i]*4],arrayLayerHits[1,selHits[i]*4+1], marker = '*', color='blue', ms=mks)
-            #plt.plot(arrayLayerHits[selHits[i],0],arrayLayerHits[selHits[i],1],'bo', ms=(mks-1))
+            lastPlusHit = [np.sqrt(np.square(l2hit[0])+np.square(l2hit[1])),np.arctan2(l2hit[1],l2hit[0]),1,0]
+            lastMinusHit = [np.sqrt(np.square(l2hit[0])+np.square(l2hit[1])),np.arctan2(l2hit[1],l2hit[0]),1,0]
+            ### Now we have to consider a positive and negative charge track
+            for k in range(8):
+                updatePlusHit = updatePosition(lastPlusHit[0], lastPlusHit[1], lastPlusHit[2], lastPlusHit[3], 1/(realv), k + 3, 1)
+                updateMinusHit = updatePosition(lastMinusHit[0], lastMinusHit[1], lastMinusHit[2], lastMinusHit[3], 1/(realv), k + 3, -1)
+                
+                tmpPlusTrack.append([updatePlusHit[0],updatePlusHit[1]])
+                tmpMinusTrack.append([updateMinusHit[0],updateMinusHit[1]])
+
+                lastPlusHit = updatePlusHit
+                lastMinusHit = updateMinusHit
+
+            print(tmpPlusTrack)
+
+            for k in range(2,len(tmpPlusTrack)):
+                tmpR = tmpPlusTrack[k][0]
+                tmpPhi = tmpPlusTrack[k][1]
+                
+                tmpPlusTrack[k][0] = tmpR * np.cos(tmpPhi)
+                tmpPlusTrack[k][1] = tmpR * np.sin(tmpPhi)
+
+                tmpR = tmpMinusTrack[k][0]
+                tmpPhi = tmpMinusTrack[k][1]
+
+                tmpMinusTrack[k][0] = tmpR * np.cos(tmpPhi)
+                tmpMinusTrack[k][1] = tmpR * np.sin(tmpPhi)
+
+            plotxPlus = []
+            plotyPlus = []
+            plotxMinus = []
+            plotyMinus = []
+
+            for a in range(len(tmpPlusTrack)):
+                plotxPlus.append(tmpPlusTrack[a][0])
+                plotyPlus.append(tmpPlusTrack[a][1])
+                plotxMinus.append(tmpMinusTrack[a][0])
+                plotyMinus.append(tmpMinusTrack[a][1])
+
+            plt.plot(plotxPlus,plotyPlus,marker = 7)
+            plt.plot(plotxMinus,plotyMinus,marker = 8)
+            #plt.plot(tmpMinusTrack)
+
+
+
+        ### Plotting nearest hits
+        #mks=7
+        #pointsLayer=[[l1hit[0],l2projhit[0]],[l1hit[1],l2projhit[1]]]
+        #plt.plot(pointsLayer[0],pointsLayer[1],'--',marker='^', color='green',ms=0)
+        #plt.plot(l2projhit[0],l2projhit[1],marker='^', color='green', ms=mks)
+        #for i in range(len(selHits)):
+        #    plt.plot(arrayLayerHits[1,selHits[i]*4],arrayLayerHits[1,selHits[i]*4+1], marker = '*', color='blue', ms=mks)
+        #    #plt.plot(arrayLayerHits[selHits[i],0],arrayLayerHits[selHits[i],1],'bo', ms=(mks-1))
 
 
 
@@ -368,9 +418,8 @@ for i in range(1,11): #Plots circles in MPL
 plt.gca().set_aspect('equal') # Squared aspect ratio
 plt.title(r"$p_T=0.9$GeV, $m_{\pi}=0.14$GeV/c$^2$, $B=20$T",size=15)
 
-plt.xlim([0,2.5]) #Defines axis in MPL
-plt.ylim([0,2.5])
+plt.xlim([-2.5,10.5]) #Defines axis in MPL
+plt.ylim([-2.5,10.5])
 plt.legend()
 plt.show()
-simpleHistogram(NumbNear,10)
 f.close()
