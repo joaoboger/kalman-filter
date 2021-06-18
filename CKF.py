@@ -62,7 +62,7 @@ def updatePosition(r, phi, vr, vphi, dt, j, q): #Calculates the update position 
     bestn = -1
 
     for i in range(0,t.size):
-        if x[i,0]<j-0.01:
+        if x[i,0]<j-0.001:
             True
         else:
             bestn=i
@@ -141,13 +141,13 @@ def lineTo2Layer(FirstLayerHit):
 
     return l2hit
 
-def findNearest2LayerHits(l2projhit,arrayLayerHits,tolerance):
+def findNearestNLayerHits(N,l2projhit,arrayLayerHits,tolerance):
     tol = tolerance
 
     selectedHits = [] # List with the index of selected hits in arrayLayerHits[1,:]
 
     for i in range(int(arrayLayerHits.shape[1]/4)):
-        testingHit = np.array([arrayLayerHits[1,i*4],arrayLayerHits[1,i*4+1]])
+        testingHit = np.array([arrayLayerHits[(N-1),i*4],arrayLayerHits[(N-1),i*4+1]])
         distance = norm(l2projhit-testingHit)
         if distance <= tolerance:
             selectedHits.append(i)
@@ -338,7 +338,7 @@ for file in os.scandir(dirloc):
     #Looping Kalman Filter for each particle
     #### Loop over tracks
     fig,axs = plt.subplots()
-    for i in range(4,5):
+    for i in range(9,10):
         # Seed to get the initial conditions for our prediction: x-coordinate, y-coordinate, radial velocity, angular velocity
         l1hit = np.array([arrayLayerHits[0,4*i], arrayLayerHits[0,4*i+1], arrayLayerHits[0,4*i+2], arrayLayerHits[0,4*i+3]]) 
 
@@ -346,9 +346,10 @@ for file in os.scandir(dirloc):
         l2projhit = lineTo2Layer(l1hit) 
 
         ### Find nearest hits of second layer
-        selHitsL2 = findNearest2LayerHits(l2projhit,arrayLayerHits,0.13)
+        selHitsL2 = findNearestNLayerHits(2,l2projhit,arrayLayerHits,0.13)
         recTracks = []
 
+        print(arrayLayerHits.shape)
         for j in range(len(selHitsL2)):
             ### Load seed
             l2hit = [arrayLayerHits[1,selHitsL2[j]*4],arrayLayerHits[1,selHitsL2[j]*4+1],arrayLayerHits[1,selHitsL2[j]*4+2],arrayLayerHits[1,selHitsL2[j]*4+3]]
@@ -357,18 +358,41 @@ for file in os.scandir(dirloc):
 
             lastPlusHit = [np.sqrt(np.square(l2hit[0])+np.square(l2hit[1])),np.arctan2(l2hit[1],l2hit[0]),1,0]
             lastMinusHit = [np.sqrt(np.square(l2hit[0])+np.square(l2hit[1])),np.arctan2(l2hit[1],l2hit[0]),1,0]
+
             ### Now we have to consider a positive and negative charge track
             for k in range(8):
+                tmpNearPlusHitsX = []
+                tmpNearPlusHitsY = []
+                tmpNearMinusHitsX = []
+                tmpNearMinusHitsY = [] 
+                nearPlusHits = []
+                nearMinusHits = []
+
                 updatePlusHit = updatePosition(lastPlusHit[0], lastPlusHit[1], lastPlusHit[2], lastPlusHit[3], 1/(realv), k + 3, 1)
                 updateMinusHit = updatePosition(lastMinusHit[0], lastMinusHit[1], lastMinusHit[2], lastMinusHit[3], 1/(realv), k + 3, -1)
+
+                upPlusHit = np.array([updatePlusHit[0] * np.cos(updatePlusHit[1]), updatePlusHit[0] * np.sin(updatePlusHit[1])])
+                upMinusHit = np.array([updateMinusHit[0] * np.cos(updateMinusHit[1]), updateMinusHit[0] * np.sin(updateMinusHit[1])])
+                print(upPlusHit, upMinusHit)
+                nearPlusHits = findNearestNLayerHits(k+3, upPlusHit, arrayLayerHits, 0.13)
+                nearMinusHits = findNearestNLayerHits(k+3, upMinusHit, arrayLayerHits, 0.13)
+
+        
+                for l in range(len(nearPlusHits)):
+                    tmpNearPlusHitsX.append(arrayLayerHits[k+2, nearPlusHits[l]*4])
+                    tmpNearPlusHitsY.append(arrayLayerHits[k+2, nearPlusHits[l]*4+1])
+                for l in range(len(nearMinusHits)):
+                    tmpNearMinusHitsX.append(arrayLayerHits[k+2, nearMinusHits[l]*4])
+                    tmpNearMinusHitsY.append(arrayLayerHits[k+2, nearMinusHits[l]*4+1])
                 
-                tmpPlusTrack.append([updatePlusHit[0],updatePlusHit[1]])
-                tmpMinusTrack.append([updateMinusHit[0],updateMinusHit[1]])
+                plt.plot(tmpNearPlusHitsX, tmpNearPlusHitsY, marker=4, ms=7)
+                plt.plot(tmpNearMinusHitsX, tmpNearMinusHitsY, marker=4, ms=7)
+
+                tmpPlusTrack.append([updatePlusHit[0], updatePlusHit[1]])
+                tmpMinusTrack.append([updateMinusHit[0], updateMinusHit[1]])
 
                 lastPlusHit = updatePlusHit
                 lastMinusHit = updateMinusHit
-
-            print(tmpPlusTrack)
 
             for k in range(2,len(tmpPlusTrack)):
                 tmpR = tmpPlusTrack[k][0]
@@ -383,6 +407,8 @@ for file in os.scandir(dirloc):
                 tmpMinusTrack[k][0] = tmpR * np.cos(tmpPhi)
                 tmpMinusTrack[k][1] = tmpR * np.sin(tmpPhi)
 
+                
+
             plotxPlus = []
             plotyPlus = []
             plotxMinus = []
@@ -394,8 +420,9 @@ for file in os.scandir(dirloc):
                 plotxMinus.append(tmpMinusTrack[a][0])
                 plotyMinus.append(tmpMinusTrack[a][1])
 
-            plt.plot(plotxPlus,plotyPlus,marker = 7)
-            plt.plot(plotxMinus,plotyMinus,marker = 8)
+            print(plotxPlus,plotyPlus)
+            plt.plot(plotxPlus,plotyPlus,marker = 3, ms=3)
+            plt.plot(plotxMinus,plotyMinus,marker = 4, ms=3)
             #plt.plot(tmpMinusTrack)
 
 
